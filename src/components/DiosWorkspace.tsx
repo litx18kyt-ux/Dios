@@ -1,10 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ArrowLeft, Upload, FileSpreadsheet, Download, CheckCircle2, 
   Trash2, Eye, X, RefreshCw, Layers, Building2, Search, Calculator,
-  Package, Bot, Sparkles, Check, Loader2, Calendar, AlertTriangle
+  Package, Bot, Sparkles, Check, Loader2, Calendar, AlertTriangle, Radio
 } from 'lucide-react';
-import { RENDER_API_URL } from '../config';
 import { MASTER_PRODUCTS } from '../data/masterProducts';
 import { parsePartyFile, PartyParseSummary, matchMasterProduct } from '../parsers';
 import { exportToExcel } from '../utils/excelExporter';
@@ -71,9 +70,21 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
   const [botLoading, setBotLoading] = useState(false);
   const [botStatus, setBotStatus] = useState<string>('');
   const [botError, setBotError] = useState<string | null>(null);
+  const [serverOnline, setServerOnline] = useState<boolean | null>(null);
   const [fetchedPrimaryResult, setFetchedPrimaryResult] = useState<any | null>(null);
 
   const activePartyNames = Object.values(partyDataMap).map(p => p.partyName);
+
+  // Check server health on modal open
+  useEffect(() => {
+    if (showCboModal) {
+      setServerOnline(null);
+      fetch('https://dios-xmo1.onrender.com/')
+        .then(r => r.json())
+        .then(() => setServerOnline(true))
+        .catch(() => setServerOnline(false));
+    }
+  }, [showCboModal]);
 
   const { products, summary } = useMemo(() => {
     let totalSalesUnits = 0;
@@ -164,50 +175,63 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
     }
   };
 
-  // 🤖 LIVE CBO BOT TRIGGER (Wakes up Render & Fetches Real Data)
+  // 🤖 1000 IQ LIVE CBO BOT CALL (With Auto Retry & Dual Route)
   const handleTriggerBot = async () => {
     setBotLoading(true);
-    setBotStatus('Connecting to 24/7 Cloud Bot on Render...');
+    setBotStatus('Connecting to CBO Bot...');
     setBotError(null);
     setFetchedPrimaryResult(null);
 
-    try {
-      // Step 1: Wake up ping
-      setBotStatus('Checking Bot Server connection...');
-      await fetch(`${RENDER_API_URL}/`, { method: 'GET', mode: 'cors' }).catch(() => null);
+    const payload = {
+      from_month: fromMonth,
+      to_month: toMonth,
+      fy_year: '2026-2027'
+    };
 
-      // Step 2: Trigger Live Scrape
-      setBotStatus(`Bot running: Logging into CBO ERP & extracting ${fromMonth} to ${toMonth}...`);
+    try {
+      setBotStatus(`⚡ Querying CBO ERP for ${fromMonth} to ${toMonth}...`);
       
-      const res = await fetch(`${RENDER_API_URL}/api/fetch-primary`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          from_month: fromMonth,
-          to_month: toMonth,
-          fy_year: '2026-2027'
-        })
-      });
+      let res: Response | null = null;
+
+      // 1. Try Cloudflare Proxy Route first
+      try {
+        res = await fetch('/api/fetch-primary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } catch (proxyErr) {
+        console.warn('Proxy route failed, trying direct Render API...', proxyErr);
+      }
+
+      // 2. If proxy failed, try Direct Render Route
+      if (!res || !res.ok) {
+        setBotStatus('Connecting directly to Render Cloud Bot...');
+        res = await fetch('https://dios-xmo1.onrender.com/api/fetch-primary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
 
       const responseText = await res.text();
       let json: any;
       try {
         json = JSON.parse(responseText);
       } catch {
-        throw new Error(`Server status ${res.status}: ${responseText.slice(0, 150)}`);
+        throw new Error(`Server returned status ${res.status}: ${responseText.slice(0, 120)}`);
       }
 
       if (!res.ok || !json.success || !json.items || json.items.length === 0) {
-        throw new Error(json.error || json.detail || 'CBO Bot returned 0 products. Please try again.');
+        throw new Error(json.error || json.detail || 'CBO Bot returned 0 products for this range.');
       }
 
       setFetchedPrimaryResult(json);
-      setBotStatus(`🎉 SUCCESS! Live data received (${json.count} products)`);
+      setBotStatus(`🎉 SUCCESS! Extracted ${json.count} live products from CBO!`);
+      setServerOnline(true);
     } catch (err: any) {
       console.error(err);
-      setBotError(err.message || 'Connection failed.');
+      setBotError(err.message || 'Connection failed to CBO Bot server.');
       setBotStatus('Failed to fetch live data.');
     } finally {
       setBotLoading(false);
@@ -283,7 +307,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         
         <div className="flex items-center gap-3">
           <span className="text-[11px] bg-cyan-950 text-cyan-300 border border-cyan-500/40 px-3 py-1 rounded-full font-mono font-bold flex items-center gap-1.5 shadow-lg shadow-cyan-950/50">
-            <Sparkles size={13} className="text-cyan-400 animate-pulse" /> DIOS V31.0 (LIVE CBO BOT CONNECTED)
+            <Sparkles size={13} className="text-cyan-400 animate-pulse" /> DIOS V32.0 (LIVE CBO BOT DUAL-ENGINE)
           </span>
           <span className="text-xs text-slate-400 font-medium">Month:</span>
           <select
@@ -350,7 +374,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
               <p className="text-xs text-slate-400">
                 {primaryData 
                   ? `Live Source: ${primaryData.fileName} • Total: ${primaryData.totalSales.toLocaleString()} Units`
-                  : 'Live Playwright automated scraping from CBO ERP or manual file upload'}
+                  : 'Live 24/7 automated scraping from CBO ERP or manual file upload'}
               </p>
             </div>
           </div>
@@ -608,8 +632,12 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
                   <Bot size={22} />
                 </span>
                 <div>
-                  <h3 className="text-base font-bold text-white">CBO ERP Live Auto-Sync</h3>
-                  <p className="text-xs text-slate-400">Headless Playwright Real-time Scraper</p>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    CBO ERP Live Auto-Sync
+                    {serverOnline === true && <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-mono">24/7 Bot Online</span>}
+                    {serverOnline === false && <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full font-mono">Waking Up Server...</span>}
+                  </h3>
+                  <p className="text-xs text-slate-400">Headless Playwright Real-time Scraper (Render 24/7)</p>
                 </div>
               </div>
               <button 
