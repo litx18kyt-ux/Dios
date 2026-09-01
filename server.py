@@ -6,6 +6,7 @@ from playwright.sync_api import sync_playwright
 
 app = FastAPI(title="DIOS CBO Primary API")
 
+# Allow all origins (Cloudflare Pages, Localhost, Codespaces)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,6 +24,10 @@ CBO_USER = os.getenv("CBO_USER", "6958BANWARI")
 CBO_PASS = os.getenv("CBO_PASS", "6958")
 SESSION_FILE = "cbo_session.json"
 LOGIN_URL = "https://dios.myreporting.net/erp/login"
+
+@app.get("/")
+def root():
+    return {"status": "online", "message": "DIOS CBO Bot API is Live and Running!"}
 
 def execute_cbo_fetch(from_month: str, to_month: str, fy_year: str):
     os.makedirs("csv_output", exist_ok=True)
@@ -43,7 +48,7 @@ def execute_cbo_fetch(from_month: str, to_month: str, fy_year: str):
         page = context.new_page()
         page.on("dialog", lambda dialog: dialog.accept())
 
-        # 1. Login check
+        # Step 1: Login
         page.goto(LOGIN_URL, timeout=60000, wait_until="networkidle")
         page.wait_for_timeout(1000)
 
@@ -60,11 +65,11 @@ def execute_cbo_fetch(from_month: str, to_month: str, fy_year: str):
             page.wait_for_timeout(3000)
             context.storage_state(path=SESSION_FILE)
 
-        # 2. Open Form
+        # Step 2: Open Form
         page.goto(direct_report_url, timeout=60000, wait_until="domcontentloaded")
         page.wait_for_timeout(3500)
 
-        # 3. Select From & To Month
+        # Step 3: Select Months
         target_frame = None
         for f in page.frames:
             try:
@@ -99,7 +104,7 @@ def execute_cbo_fetch(from_month: str, to_month: str, fy_year: str):
         if not target_frame:
             target_frame = page.main_frame
 
-        # 4. Click Go
+        # Step 4: Click Go
         active_page = page
         try:
             with context.expect_page(timeout=5000) as popup_info:
@@ -119,7 +124,7 @@ def execute_cbo_fetch(from_month: str, to_month: str, fy_year: str):
         active_page.wait_for_load_state("domcontentloaded")
         active_page.wait_for_timeout(6000)
 
-        # 5. Extract Data Rows
+        # Step 5: Extract Data
         scraped_products = []
         for f in active_page.frames:
             rows = f.evaluate("""() => {
@@ -154,14 +159,6 @@ def execute_cbo_fetch(from_month: str, to_month: str, fy_year: str):
                             "value": val
                         })
 
-        # Save to CSV for persistent backup
-        out_csv = f"csv_output/Primary_{from_month}_to_{to_month}.csv"
-        with open(out_csv, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(["PRODUCT NAME", "PRIMARY QTY", "PRIMARY VALUE"])
-            for p_item in scraped_products:
-                writer.writerow([p_item["name"], p_item["qty"], p_item["value"]])
-
         browser.close()
         return scraped_products
 
@@ -185,7 +182,3 @@ def fetch_primary(req: FetchRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -2,8 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { 
   ArrowLeft, Upload, FileSpreadsheet, Download, CheckCircle2, 
   Trash2, Eye, X, RefreshCw, Layers, Building2, Search, Calculator,
-  Package, Bot, Sparkles, Check, Loader2, Calendar, FileCheck
+  Package, Bot, Sparkles, Check, Loader2, Calendar, AlertTriangle
 } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 import { MASTER_PRODUCTS } from '../data/masterProducts';
 import { parsePartyFile, PartyParseSummary, matchMasterProduct } from '../parsers';
 import { exportToExcel } from '../utils/excelExporter';
@@ -69,6 +70,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
   const [toMonth, setToMonth] = useState('Aug-2026');
   const [botLoading, setBotLoading] = useState(false);
   const [botStatus, setBotStatus] = useState<string>('');
+  const [botError, setBotError] = useState<string | null>(null);
   const [fetchedPrimaryResult, setFetchedPrimaryResult] = useState<any | null>(null);
 
   const activePartyNames = Object.values(partyDataMap).map(p => p.partyName);
@@ -162,16 +164,17 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
     }
   };
 
-  // 🤖 Trigger CBO ERP Bot via API
+  // 🤖 LIVE CBO BOT TRIGGER (Connects to Render 24/7 API)
   const handleTriggerBot = async () => {
     setBotLoading(true);
-    setBotStatus('Connecting to CBO ERP Bot...');
+    setBotStatus('Connecting to 24/7 CBO Bot on Render...');
+    setBotError(null);
     setFetchedPrimaryResult(null);
 
     try {
-      setBotStatus(`Fetching CBO data for ${fromMonth} to ${toMonth}...`);
+      setBotStatus(`Bot running: Logging into CBO & extracting ${fromMonth} to ${toMonth}...`);
       
-      const res = await fetch('/api/fetch-primary', {
+      const res = await fetch(`${API_BASE_URL}/fetch-primary`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -184,14 +187,15 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
       const json = await res.json();
       
       if (!res.ok || !json.success || !json.items || json.items.length === 0) {
-        throw new Error(json.error || '0 products found. Make sure Python Bot server is running (./start.sh).');
+        throw new Error(json.error || json.detail || 'CBO Bot returned 0 products. Please try again.');
       }
 
       setFetchedPrimaryResult(json);
-      setBotStatus(`✅ Successfully fetched ${json.count} products from CBO!`);
+      setBotStatus(`🎉 SUCCESS! Live data received (${json.count} products)`);
     } catch (err: any) {
       console.error(err);
-      setBotStatus(`⚠️ ${err.message || 'Failed to connect to Bot.'}`);
+      setBotError(err.message || 'Connection failed to Render API.');
+      setBotStatus('Failed to fetch live data.');
     } finally {
       setBotLoading(false);
     }
@@ -216,7 +220,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
     });
 
     const parsedSummary: PartyParseSummary = {
-      partyName: 'Company Primary Dispatch (CBO)',
+      partyName: 'Company Primary Dispatch (CBO Live Bot)',
       fileName: `CBO_${fromMonth}_to_${toMonth}`,
       itemCount: matchedCount,
       totalSales: fetchedPrimaryResult.total_qty,
@@ -265,8 +269,8 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         </button>
         
         <div className="flex items-center gap-3">
-          <span className="text-[11px] bg-cyan-950 text-cyan-300 border border-cyan-500/40 px-3 py-1 rounded-full font-mono font-bold flex items-center gap-1.5">
-            <Sparkles size={13} className="text-cyan-400" /> DIOS V28.0 (CBO LIVE AUTO-IMPORT)
+          <span className="text-[11px] bg-cyan-950 text-cyan-300 border border-cyan-500/40 px-3 py-1 rounded-full font-mono font-bold flex items-center gap-1.5 shadow-lg shadow-cyan-950/50">
+            <Sparkles size={13} className="text-cyan-400 animate-pulse" /> DIOS V30.0 (CBO LIVE BOT ENGINE)
           </span>
           <span className="text-xs text-slate-400 font-medium">Month:</span>
           <select
@@ -332,8 +336,8 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
               </h3>
               <p className="text-xs text-slate-400">
                 {primaryData 
-                  ? `Source: ${primaryData.fileName} • Total Dispatch: ${primaryData.totalSales.toLocaleString()} Units`
-                  : 'Auto-fetch directly from CBO ERP via Bot or upload manual Excel file'}
+                  ? `Live Source: ${primaryData.fileName} • Total: ${primaryData.totalSales.toLocaleString()} Units`
+                  : 'Live Playwright automated scraping from CBO ERP or manual file upload'}
               </p>
             </div>
           </div>
@@ -591,12 +595,12 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
                   <Bot size={22} />
                 </span>
                 <div>
-                  <h3 className="text-base font-bold text-white">CBO ERP Primary Auto-Sync</h3>
-                  <p className="text-xs text-slate-400">Headless Playwright Automated Scraper</p>
+                  <h3 className="text-base font-bold text-white">CBO ERP Live Auto-Sync</h3>
+                  <p className="text-xs text-slate-400">Headless Playwright Real-time Scraper</p>
                 </div>
               </div>
               <button 
-                onClick={() => { setShowCboModal(false); setFetchedPrimaryResult(null); }}
+                onClick={() => { setShowCboModal(false); setFetchedPrimaryResult(null); setBotError(null); }}
                 className="text-slate-400 hover:text-white cursor-pointer p-1"
               >
                 <X size={20} />
@@ -639,12 +643,23 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
             </div>
 
             {/* Status Feedback */}
-            {botStatus && (
+            {botStatus && !botError && (
               <div className={`p-3 rounded-xl text-xs mb-5 flex items-center gap-2 ${
-                fetchedPrimaryResult && fetchedPrimaryResult.count > 0 ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-300' : 'bg-slate-950 border border-slate-800 text-cyan-300'
+                fetchedPrimaryResult ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-300' : 'bg-slate-950 border border-slate-800 text-cyan-300'
               }`}>
                 {botLoading ? <Loader2 size={16} className="animate-spin text-cyan-400" /> : <Check size={16} className="text-emerald-400" />}
                 <span>{botStatus}</span>
+              </div>
+            )}
+
+            {/* Error Feedback */}
+            {botError && (
+              <div className="p-3.5 rounded-xl text-xs mb-5 bg-rose-950/60 border border-rose-500/40 text-rose-300 flex items-start gap-2.5">
+                <AlertTriangle size={18} className="text-rose-400 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-bold">Bot Error:</div>
+                  <div className="text-[11px] text-rose-200 mt-0.5">{botError}</div>
+                </div>
               </div>
             )}
 
@@ -652,7 +667,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
             {fetchedPrimaryResult && fetchedPrimaryResult.count > 0 && (
               <div className="mb-5 p-4 bg-slate-950 rounded-2xl border border-emerald-500/40 space-y-2 text-xs">
                 <div className="font-bold text-emerald-400 flex items-center justify-between border-b border-slate-800 pb-2">
-                  <span>🎉 Successfully Extracted from CBO!</span>
+                  <span>🎉 Live Extracted from CBO ERP!</span>
                   <span>{fetchedPrimaryResult.count} Products</span>
                 </div>
                 <div className="flex justify-between text-slate-300 pt-1">
@@ -670,7 +685,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => { setShowCboModal(false); setFetchedPrimaryResult(null); }}
+                onClick={() => { setShowCboModal(false); setFetchedPrimaryResult(null); setBotError(null); }}
                 disabled={botLoading}
                 className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
               >
@@ -685,7 +700,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
                   className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-cyan-500/20 transition cursor-pointer"
                 >
                   {botLoading ? <Loader2 size={16} className="animate-spin" /> : <Bot size={16} />}
-                  {botLoading ? 'Fetching from CBO...' : 'Fetch from CBO ERP'}
+                  {botLoading ? 'Running CBO Bot...' : 'Fetch from CBO ERP'}
                 </button>
               ) : (
                 <button
