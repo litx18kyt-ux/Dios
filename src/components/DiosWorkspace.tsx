@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   ArrowLeft, Upload, FileSpreadsheet, Download, CheckCircle2, 
   Trash2, Eye, X, RefreshCw, Layers, Building2, Search, Calculator,
-  Package, Bot, Sparkles, Check, Loader2, Calendar
+  Package, Bot, Sparkles, Check, Loader2, Calendar, FileCheck
 } from 'lucide-react';
 import { MASTER_PRODUCTS } from '../data/masterProducts';
 import { parsePartyFile, PartyParseSummary, matchMasterProduct } from '../parsers';
@@ -181,17 +181,17 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         })
       });
 
-      if (!res.ok) {
-        throw new Error('Failed to fetch data from CBO ERP.');
+      const json = await res.json();
+      
+      if (!res.ok || !json.success || !json.items || json.items.length === 0) {
+        throw new Error(json.error || '0 products found. Make sure Python Bot server is running (./start.sh).');
       }
 
-      const json = await res.json();
       setFetchedPrimaryResult(json);
-      setBotStatus('✅ Primary Data fetched successfully!');
+      setBotStatus(`✅ Successfully fetched ${json.count} products from CBO!`);
     } catch (err: any) {
       console.error(err);
-      alert('Error fetching from CBO Bot. Make sure backend is running or deploy to Cloudflare.');
-      setBotStatus('Failed to connect to Bot.');
+      setBotStatus(`⚠️ ${err.message || 'Failed to connect to Bot.'}`);
     } finally {
       setBotLoading(false);
     }
@@ -641,7 +641,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
             {/* Status Feedback */}
             {botStatus && (
               <div className={`p-3 rounded-xl text-xs mb-5 flex items-center gap-2 ${
-                fetchedPrimaryResult ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-300' : 'bg-slate-950 border border-slate-800 text-cyan-300'
+                fetchedPrimaryResult && fetchedPrimaryResult.count > 0 ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-300' : 'bg-slate-950 border border-slate-800 text-cyan-300'
               }`}>
                 {botLoading ? <Loader2 size={16} className="animate-spin text-cyan-400" /> : <Check size={16} className="text-emerald-400" />}
                 <span>{botStatus}</span>
@@ -649,7 +649,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
             )}
 
             {/* Fetched Data Summary Box */}
-            {fetchedPrimaryResult && (
+            {fetchedPrimaryResult && fetchedPrimaryResult.count > 0 && (
               <div className="mb-5 p-4 bg-slate-950 rounded-2xl border border-emerald-500/40 space-y-2 text-xs">
                 <div className="font-bold text-emerald-400 flex items-center justify-between border-b border-slate-800 pb-2">
                   <span>🎉 Successfully Extracted from CBO!</span>
@@ -677,7 +677,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
                 Cancel
               </button>
 
-              {!fetchedPrimaryResult ? (
+              {(!fetchedPrimaryResult || fetchedPrimaryResult.count === 0) ? (
                 <button
                   type="button"
                   onClick={handleTriggerBot}
