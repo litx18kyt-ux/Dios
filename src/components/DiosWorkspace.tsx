@@ -1,9 +1,8 @@
-import { API_BASE_URL } from "../config";
 import React, { useState, useMemo } from 'react';
 import { 
   ArrowLeft, Upload, FileSpreadsheet, Download, CheckCircle2, 
   Trash2, Eye, X, RefreshCw, Layers, Building2, Search, Calculator,
-  Package, Bot, Sparkles, Check, AlertCircle, Loader2, Calendar
+  Package, Bot, Sparkles, Check, Loader2, Calendar
 } from 'lucide-react';
 import { MASTER_PRODUCTS } from '../data/masterProducts';
 import { parsePartyFile, PartyParseSummary, matchMasterProduct } from '../parsers';
@@ -170,9 +169,9 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
     setFetchedPrimaryResult(null);
 
     try {
-      setBotStatus(`Logging in & setting range: ${fromMonth} to ${toMonth}...`);
+      setBotStatus(`Fetching CBO data for ${fromMonth} to ${toMonth}...`);
       
-      const res = await fetch(`${API_BASE_URL}/fetch-primary`', {
+      const res = await fetch('/api/fetch-primary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -191,8 +190,8 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
       setBotStatus('✅ Primary Data fetched successfully!');
     } catch (err: any) {
       console.error(err);
-      alert('Error fetching from CBO Bot. Please make sure the Python server is running (./start.sh).');
-      setBotStatus('Failed to connect to Bot server.');
+      alert('Error fetching from CBO Bot. Make sure backend is running or deploy to Cloudflare.');
+      setBotStatus('Failed to connect to Bot.');
     } finally {
       setBotLoading(false);
     }
@@ -463,7 +462,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         </div>
       </div>
 
-      {/* METRICS SUMMARY: 3-WAY RECONCILIATION */}
+      {/* METRICS SUMMARY */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <div className="text-xs text-blue-400 uppercase font-semibold">Total Primary Dispatch</div>
