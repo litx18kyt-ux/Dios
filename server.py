@@ -6,10 +6,12 @@ from playwright.sync_api import sync_playwright
 
 app = FastAPI(title="DIOS CBO Primary API")
 
+# Allow all origins with clean headers for Safari
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 

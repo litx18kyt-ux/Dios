@@ -4,6 +4,7 @@ import {
   Trash2, Eye, X, RefreshCw, Layers, Building2, Search, Calculator,
   Package, Bot, Sparkles, Check, Loader2, Calendar, AlertTriangle
 } from 'lucide-react';
+import { RENDER_API_URL } from '../config';
 import { MASTER_PRODUCTS } from '../data/masterProducts';
 import { parsePartyFile, PartyParseSummary, matchMasterProduct } from '../parsers';
 import { exportToExcel } from '../utils/excelExporter';
@@ -163,19 +164,26 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
     }
   };
 
-  // 🤖 LIVE CBO BOT TRIGGER (Calls Cloudflare Proxy -> Render Backend)
+  // 🤖 LIVE CBO BOT TRIGGER (Wakes up Render & Fetches Real Data)
   const handleTriggerBot = async () => {
     setBotLoading(true);
-    setBotStatus('Connecting to CBO Cloud Bot...');
+    setBotStatus('Connecting to 24/7 Cloud Bot on Render...');
     setBotError(null);
     setFetchedPrimaryResult(null);
 
     try {
-      setBotStatus(`Bot running: Logging into CBO & extracting ${fromMonth} to ${toMonth}...`);
+      // Step 1: Wake up ping
+      setBotStatus('Checking Bot Server connection...');
+      await fetch(`${RENDER_API_URL}/`, { method: 'GET', mode: 'cors' }).catch(() => null);
+
+      // Step 2: Trigger Live Scrape
+      setBotStatus(`Bot running: Logging into CBO ERP & extracting ${fromMonth} to ${toMonth}...`);
       
-      const res = await fetch('/api/fetch-primary', {
+      const res = await fetch(`${RENDER_API_URL}/api/fetch-primary`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           from_month: fromMonth,
           to_month: toMonth,
@@ -183,8 +191,14 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         })
       });
 
-      const json = await res.json();
-      
+      const responseText = await res.text();
+      let json: any;
+      try {
+        json = JSON.parse(responseText);
+      } catch {
+        throw new Error(`Server status ${res.status}: ${responseText.slice(0, 150)}`);
+      }
+
       if (!res.ok || !json.success || !json.items || json.items.length === 0) {
         throw new Error(json.error || json.detail || 'CBO Bot returned 0 products. Please try again.');
       }
@@ -269,7 +283,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         
         <div className="flex items-center gap-3">
           <span className="text-[11px] bg-cyan-950 text-cyan-300 border border-cyan-500/40 px-3 py-1 rounded-full font-mono font-bold flex items-center gap-1.5 shadow-lg shadow-cyan-950/50">
-            <Sparkles size={13} className="text-cyan-400 animate-pulse" /> DIOS V30.0 (CBO LIVE BOT ENGINE)
+            <Sparkles size={13} className="text-cyan-400 animate-pulse" /> DIOS V31.0 (LIVE CBO BOT CONNECTED)
           </span>
           <span className="text-xs text-slate-400 font-medium">Month:</span>
           <select
@@ -595,7 +609,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
                 </span>
                 <div>
                   <h3 className="text-base font-bold text-white">CBO ERP Live Auto-Sync</h3>
-                  <p className="text-xs text-slate-400">Cloudflare Proxy ➔ Render Playwright Bot</p>
+                  <p className="text-xs text-slate-400">Headless Playwright Real-time Scraper</p>
                 </div>
               </div>
               <button 
@@ -656,7 +670,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
               <div className="p-3.5 rounded-xl text-xs mb-5 bg-rose-950/60 border border-rose-500/40 text-rose-300 flex items-start gap-2.5">
                 <AlertTriangle size={18} className="text-rose-400 shrink-0 mt-0.5" />
                 <div>
-                  <div className="font-bold">Bot Error:</div>
+                  <div className="font-bold">Bot Status:</div>
                   <div className="text-[11px] text-rose-200 mt-0.5">{botError}</div>
                 </div>
               </div>
