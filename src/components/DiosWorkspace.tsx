@@ -4,7 +4,6 @@ import {
   Trash2, Eye, X, RefreshCw, Layers, Building2, Search, Calculator,
   Package, Bot, Sparkles, Check, Loader2, Calendar, AlertTriangle
 } from 'lucide-react';
-import { API_BASE_URL } from '../config';
 import { MASTER_PRODUCTS } from '../data/masterProducts';
 import { parsePartyFile, PartyParseSummary, matchMasterProduct } from '../parsers';
 import { exportToExcel } from '../utils/excelExporter';
@@ -164,17 +163,17 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
     }
   };
 
-  // 🤖 LIVE CBO BOT TRIGGER (Connects to Render 24/7 API)
+  // 🤖 LIVE CBO BOT TRIGGER (Calls Cloudflare Proxy -> Render Backend)
   const handleTriggerBot = async () => {
     setBotLoading(true);
-    setBotStatus('Connecting to 24/7 CBO Bot on Render...');
+    setBotStatus('Connecting to CBO Cloud Bot...');
     setBotError(null);
     setFetchedPrimaryResult(null);
 
     try {
       setBotStatus(`Bot running: Logging into CBO & extracting ${fromMonth} to ${toMonth}...`);
       
-      const res = await fetch(`${API_BASE_URL}/fetch-primary`, {
+      const res = await fetch('/api/fetch-primary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -194,7 +193,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
       setBotStatus(`🎉 SUCCESS! Live data received (${json.count} products)`);
     } catch (err: any) {
       console.error(err);
-      setBotError(err.message || 'Connection failed to Render API.');
+      setBotError(err.message || 'Connection failed.');
       setBotStatus('Failed to fetch live data.');
     } finally {
       setBotLoading(false);
@@ -596,7 +595,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
                 </span>
                 <div>
                   <h3 className="text-base font-bold text-white">CBO ERP Live Auto-Sync</h3>
-                  <p className="text-xs text-slate-400">Headless Playwright Real-time Scraper</p>
+                  <p className="text-xs text-slate-400">Cloudflare Proxy ➔ Render Playwright Bot</p>
                 </div>
               </div>
               <button 

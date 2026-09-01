@@ -6,11 +6,9 @@ from playwright.sync_api import sync_playwright
 
 app = FastAPI(title="DIOS CBO Primary API")
 
-# Allow all origins (Cloudflare Pages, Localhost, Codespaces)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
