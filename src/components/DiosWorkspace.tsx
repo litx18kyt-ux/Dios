@@ -71,6 +71,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
   const [botLoading, setBotLoading] = useState(false);
   const [botStatus, setBotStatus] = useState<string>('');
   const [botError, setBotError] = useState<string | null>(null);
+  const [botLogs, setBotLogs] = useState<string[]>([]);
   const [fetchedPrimaryResult, setFetchedPrimaryResult] = useState<any | null>(null);
 
   const activePartyNames = Object.values(partyDataMap).map(p => p.partyName);
@@ -164,15 +165,16 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
     }
   };
 
-  // 🤖 100% GOOGLE CLOUD CBO BOT TRIGGER (Super Fast & Zero CORS issues)
+  // 🤖 1000 IQ LIVE GOOGLE CLOUD CBO BOT TRIGGER
   const handleTriggerBot = async () => {
     setBotLoading(true);
     setBotStatus('Google Cloud Bot connecting to CBO ERP...');
     setBotError(null);
+    setBotLogs([]);
     setFetchedPrimaryResult(null);
 
     try {
-      setBotStatus(`⚡ Google Server fetching CBO data (${fromMonth} to ${toMonth})...`);
+      setBotStatus(`⚡ Google Server authenticating & querying CBO (${fromMonth} to ${toMonth})...`);
       
       const res = await fetch(GOOGLE_BOT_URL, {
         method: 'POST',
@@ -188,16 +190,17 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
       });
 
       const json = await res.json();
+      if (json.logs) setBotLogs(json.logs);
       
       if (!json.success || !json.items || json.items.length === 0) {
-        throw new Error(json.error || '0 products returned from CBO.');
+        throw new Error(json.error || '0 products returned. Check logs below.');
       }
 
       setFetchedPrimaryResult(json);
-      setBotStatus(`🎉 SUCCESS! Google Cloud extracted ${json.count} products from CBO!`);
+      setBotStatus(`🎉 SUCCESS! Extracted ${json.count} live products from CBO!`);
     } catch (err: any) {
       console.error(err);
-      setBotError(err.message || 'Connection to Google Bot failed.');
+      setBotError(err.message || 'Connection failed.');
       setBotStatus('Failed to fetch data.');
     } finally {
       setBotLoading(false);
@@ -223,7 +226,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
     });
 
     const parsedSummary: PartyParseSummary = {
-      partyName: 'Company Primary Dispatch (Google Cloud CBO)',
+      partyName: 'Company Primary Dispatch (Google CBO)',
       fileName: `CBO_${fromMonth}_to_${toMonth}`,
       itemCount: matchedCount,
       totalSales: fetchedPrimaryResult.total_qty,
@@ -273,7 +276,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         
         <div className="flex items-center gap-3">
           <span className="text-[11px] bg-cyan-950 text-cyan-300 border border-cyan-500/40 px-3 py-1 rounded-full font-mono font-bold flex items-center gap-1.5 shadow-lg shadow-cyan-950/50">
-            <Sparkles size={13} className="text-cyan-400 animate-pulse" /> DIOS V33.0 (GOOGLE CLOUD ENGINE)
+            <Sparkles size={13} className="text-cyan-400 animate-pulse" /> DIOS V34.0 (GOOGLE CLOUD CBO ENGINE)
           </span>
           <span className="text-xs text-slate-400 font-medium">Month:</span>
           <select
@@ -588,7 +591,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         </table>
       </div>
 
-      {/* 🤖 MODAL: CBO ERP AUTO-FETCH (FROM & TO RANGE) */}
+      {/* 🤖 MODAL: CBO ERP AUTO-FETCH */}
       {showCboModal && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-cyan-500/30 rounded-3xl max-w-lg w-full p-6 shadow-2xl shadow-cyan-950/60">
@@ -606,7 +609,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
                 </div>
               </div>
               <button 
-                onClick={() => { setShowCboModal(false); setFetchedPrimaryResult(null); setBotError(null); }}
+                onClick={() => { setShowCboModal(false); setFetchedPrimaryResult(null); setBotError(null); setBotLogs([]); }}
                 className="text-slate-400 hover:text-white cursor-pointer p-1"
               >
                 <X size={20} />
@@ -650,7 +653,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
 
             {/* Status Feedback */}
             {botStatus && !botError && (
-              <div className={`p-3 rounded-xl text-xs mb-5 flex items-center gap-2 ${
+              <div className={`p-3 rounded-xl text-xs mb-4 flex items-center gap-2 ${
                 fetchedPrimaryResult ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-300' : 'bg-slate-950 border border-slate-800 text-cyan-300'
               }`}>
                 {botLoading ? <Loader2 size={16} className="animate-spin text-cyan-400" /> : <Check size={16} className="text-emerald-400" />}
@@ -658,14 +661,21 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
               </div>
             )}
 
-            {/* Error Feedback */}
+            {/* Error Feedback + Logs */}
             {botError && (
-              <div className="p-3.5 rounded-xl text-xs mb-5 bg-rose-950/60 border border-rose-500/40 text-rose-300 flex items-start gap-2.5">
-                <AlertTriangle size={18} className="text-rose-400 shrink-0 mt-0.5" />
-                <div>
-                  <div className="font-bold">Bot Status:</div>
-                  <div className="text-[11px] text-rose-200 mt-0.5">{botError}</div>
+              <div className="p-3.5 rounded-xl text-xs mb-4 bg-rose-950/60 border border-rose-500/40 text-rose-300 space-y-2">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle size={18} className="text-rose-400 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-bold">Bot Diagnostic Status:</div>
+                    <div className="text-[11px] text-rose-200 mt-0.5">{botError}</div>
+                  </div>
                 </div>
+                {botLogs.length > 0 && (
+                  <div className="mt-2 p-2 bg-slate-950/80 rounded-lg text-[10px] font-mono text-slate-400 space-y-0.5 max-h-32 overflow-y-auto">
+                    {botLogs.map((l, i) => <div key={i}>• {l}</div>)}
+                  </div>
+                )}
               </div>
             )}
 
@@ -691,7 +701,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => { setShowCboModal(false); setFetchedPrimaryResult(null); setBotError(null); }}
+                onClick={() => { setShowCboModal(false); setFetchedPrimaryResult(null); setBotError(null); setBotLogs([]); }}
                 disabled={botLoading}
                 className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
               >
