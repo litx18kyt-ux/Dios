@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "../config";
 import React, { useState, useMemo } from 'react';
 import { 
   ArrowLeft, Upload, FileSpreadsheet, Download, CheckCircle2, 
@@ -171,7 +172,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
     try {
       setBotStatus(`Logging in & setting range: ${fromMonth} to ${toMonth}...`);
       
-      const res = await fetch('/api/fetch-primary', {
+      const res = await fetch(`${API_BASE_URL}/fetch-primary`', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
