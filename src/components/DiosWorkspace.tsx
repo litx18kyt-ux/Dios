@@ -2,16 +2,31 @@ import React, { useState, useMemo } from 'react';
 import { 
   ArrowLeft, Upload, FileSpreadsheet, Download, CheckCircle2, 
   Trash2, Eye, X, RefreshCw, Layers, Building2, Search, Calculator,
-  Package, Zap
+  Package, Bot, Sparkles, Check, AlertCircle, Loader2, Calendar
 } from 'lucide-react';
 import { MASTER_PRODUCTS } from '../data/masterProducts';
-import { parsePartyFile, PartyParseSummary } from '../parsers';
+import { parsePartyFile, PartyParseSummary, matchMasterProduct } from '../parsers';
 import { exportToExcel } from '../utils/excelExporter';
 import { AggregatedProduct } from '../parsers/common';
 
 const MONTHS = [
   'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 
   'OCTOBER', 'NOVEMBER', 'DECEMBER', 'JANUARY', 'FEBRUARY', 'MARCH'
+];
+
+const MONTH_OPTIONS = [
+  { label: 'Apr-2026', value: 'Apr-2026' },
+  { label: 'May-2026', value: 'May-2026' },
+  { label: 'Jun-2026', value: 'Jun-2026' },
+  { label: 'Jul-2026', value: 'Jul-2026' },
+  { label: 'Aug-2026', value: 'Aug-2026' },
+  { label: 'Sep-2026', value: 'Sep-2026' },
+  { label: 'Oct-2026', value: 'Oct-2026' },
+  { label: 'Nov-2026', value: 'Nov-2026' },
+  { label: 'Dec-2026', value: 'Dec-2026' },
+  { label: 'Jan-2027', value: 'Jan-2027' },
+  { label: 'Feb-2027', value: 'Feb-2027' },
+  { label: 'Mar-2027', value: 'Mar-2027' },
 ];
 
 interface PartySlot {
@@ -47,6 +62,14 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
   const [partyDataMap, setPartyDataMap] = useState<Record<string, PartyParseSummary>>({});
   const [primaryData, setPrimaryData] = useState<PartyParseSummary | null>(null);
   const [selectedProductForModal, setSelectedProductForModal] = useState<FullAggregatedProduct | null>(null);
+
+  // CBO Auto-Fetch Modal State
+  const [showCboModal, setShowCboModal] = useState(false);
+  const [fromMonth, setFromMonth] = useState('Aug-2026');
+  const [toMonth, setToMonth] = useState('Aug-2026');
+  const [botLoading, setBotLoading] = useState(false);
+  const [botStatus, setBotStatus] = useState<string>('');
+  const [fetchedPrimaryResult, setFetchedPrimaryResult] = useState<any | null>(null);
 
   const activePartyNames = Object.values(partyDataMap).map(p => p.partyName);
 
@@ -139,6 +162,73 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
     }
   };
 
+  // 🤖 Trigger CBO ERP Bot via API
+  const handleTriggerBot = async () => {
+    setBotLoading(true);
+    setBotStatus('Connecting to CBO ERP Bot...');
+    setFetchedPrimaryResult(null);
+
+    try {
+      setBotStatus(`Logging in & setting range: ${fromMonth} to ${toMonth}...`);
+      
+      const res = await fetch('/api/fetch-primary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from_month: fromMonth,
+          to_month: toMonth,
+          fy_year: '2026-2027'
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to fetch data from CBO ERP.');
+      }
+
+      const json = await res.json();
+      setFetchedPrimaryResult(json);
+      setBotStatus('✅ Primary Data fetched successfully!');
+    } catch (err: any) {
+      console.error(err);
+      alert('Error fetching from CBO Bot. Please make sure the Python server is running (./start.sh).');
+      setBotStatus('Failed to connect to Bot server.');
+    } finally {
+      setBotLoading(false);
+    }
+  };
+
+  // ✅ Confirm & Import into 73 Products
+  const handleApplyImport = () => {
+    if (!fetchedPrimaryResult || !fetchedPrimaryResult.items) return;
+
+    const itemsMap: Record<number, { sales: number; closing: number }> = {};
+    let matchedCount = 0;
+
+    fetchedPrimaryResult.items.forEach((scrapedItem: any) => {
+      const matched = matchMasterProduct(scrapedItem.name);
+      if (matched) {
+        if (!itemsMap[matched.sn]) {
+          itemsMap[matched.sn] = { sales: 0, closing: 0 };
+          matchedCount++;
+        }
+        itemsMap[matched.sn].sales += Number(scrapedItem.qty) || 0;
+      }
+    });
+
+    const parsedSummary: PartyParseSummary = {
+      partyName: 'Company Primary Dispatch (CBO)',
+      fileName: `CBO_${fromMonth}_to_${toMonth}`,
+      itemCount: matchedCount,
+      totalSales: fetchedPrimaryResult.total_qty,
+      totalClosing: 0,
+      items: itemsMap,
+    };
+
+    setPrimaryData(parsedSummary);
+    setShowCboModal(false);
+    setFetchedPrimaryResult(null);
+  };
+
   const handleRemoveParty = (partyId: string) => {
     if (partyId === 'primary') {
       setPrimaryData(null);
@@ -175,8 +265,8 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         </button>
         
         <div className="flex items-center gap-3">
-          <span className="text-[11px] bg-cyan-950 text-cyan-300 border border-cyan-500/40 px-3 py-1 rounded-full font-mono font-bold">
-            ⚡ DIOS V27.0 (COMPLETE 3-WAY ENGINE)
+          <span className="text-[11px] bg-cyan-950 text-cyan-300 border border-cyan-500/40 px-3 py-1 rounded-full font-mono font-bold flex items-center gap-1.5">
+            <Sparkles size={13} className="text-cyan-400" /> DIOS V28.0 (CBO LIVE AUTO-IMPORT)
           </span>
           <span className="text-xs text-slate-400 font-medium">Month:</span>
           <select
@@ -228,12 +318,12 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         </div>
       </div>
 
-      {/* 🚀 PRIMARY SALES AUTO-DISPATCH CARD */}
+      {/* 🚀 PRIMARY SALES CBO BOT DISPATCH CARD */}
       <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-blue-950/60 via-slate-900 to-indigo-950/60 border border-blue-500/40 shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="p-2 bg-blue-500/20 text-blue-400 rounded-xl border border-blue-500/30">
-              <Package size={20} />
+            <span className="p-2.5 bg-blue-500/20 text-blue-400 rounded-xl border border-blue-500/30">
+              <Package size={22} />
             </span>
             <div>
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -242,8 +332,8 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
               </h3>
               <p className="text-xs text-slate-400">
                 {primaryData 
-                  ? `File: ${primaryData.fileName} • Total Dispatch: ${primaryData.totalSales.toLocaleString()} Units`
-                  : 'Upload exported CBO Primary Excel / CSV file or run bot'}
+                  ? `Source: ${primaryData.fileName} • Total Dispatch: ${primaryData.totalSales.toLocaleString()} Units`
+                  : 'Auto-fetch directly from CBO ERP via Bot or upload manual Excel file'}
               </p>
             </div>
           </div>
@@ -257,19 +347,28 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
                 <Trash2 size={14} /> Clear Primary
               </button>
             ) : (
-              <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-600/20 transition cursor-pointer">
-                <Upload size={14} /> Upload Primary Statement
-                <input
-                  type="file"
-                  accept=".xls,.xlsx,.csv"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      handleSingleFileUpload('primary', 'Company Primary Dispatch', e.target.files[0]);
-                    }
-                  }}
-                  className="hidden"
-                />
-              </label>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowCboModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-cyan-500/20 transition cursor-pointer"
+                >
+                  <Bot size={16} /> Auto-Fetch from CBO
+                </button>
+
+                <label className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer">
+                  <Upload size={14} /> Upload File
+                  <input
+                    type="file"
+                    accept=".xls,.xlsx,.csv"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleSingleFileUpload('primary', 'Company Primary Dispatch', e.target.files[0]);
+                      }
+                    }}
+                    className="hidden"
+                  />
+                </label>
+              </div>
             )}
           </div>
         </div>
@@ -404,7 +503,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         </div>
       </div>
 
-      {/* 73 PRODUCTS HQ TABLE WITH 3 COLUMNS: PRI, SEC, CLOSING */}
+      {/* 73 PRODUCTS HQ TABLE */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-x-auto shadow-2xl max-h-[600px] flex flex-col">
         <table className="w-full text-left text-xs border-collapse">
           <thead className="sticky top-0 bg-slate-900 border-b border-slate-800 text-slate-400 font-bold uppercase z-20">
@@ -456,7 +555,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
             ))}
           </tbody>
 
-          {/* 🎯 GRAND TOTAL FOOTER */}
+          {/* GRAND TOTAL FOOTER */}
           <tfoot className="sticky bottom-0 bg-slate-950 border-t-2 border-cyan-500/40 z-20 shadow-2xl">
             <tr className="font-extrabold text-white text-xs bg-slate-950/95">
               <td className="p-3.5 text-center text-cyan-400 font-mono">Σ</td>
@@ -482,7 +581,127 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         </table>
       </div>
 
-      {/* MODAL: PARTY BREAKDOWN */}
+      {/* 🤖 MODAL: CBO ERP AUTO-FETCH (FROM & TO RANGE) */}
+      {showCboModal && (
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-cyan-500/30 rounded-3xl max-w-lg w-full p-6 shadow-2xl shadow-cyan-950/60">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
+              <div className="flex items-center gap-3">
+                <span className="p-2.5 bg-cyan-500/20 text-cyan-400 rounded-xl border border-cyan-500/40">
+                  <Bot size={22} />
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-white">CBO ERP Primary Auto-Sync</h3>
+                  <p className="text-xs text-slate-400">Headless Playwright Automated Scraper</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => { setShowCboModal(false); setFetchedPrimaryResult(null); }}
+                className="text-slate-400 hover:text-white cursor-pointer p-1"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* From & To Selector Form */}
+            <div className="grid grid-cols-2 gap-4 mb-5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                  <Calendar size={13} className="text-cyan-400" /> From Month:
+                </label>
+                <select
+                  value={fromMonth}
+                  onChange={(e) => setFromMonth(e.target.value)}
+                  disabled={botLoading}
+                  className="w-full bg-slate-950 border border-slate-700 text-cyan-300 text-xs font-bold rounded-xl px-3 py-2.5 focus:outline-none focus:border-cyan-500 cursor-pointer"
+                >
+                  {MONTH_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                  <Calendar size={13} className="text-cyan-400" /> To Month:
+                </label>
+                <select
+                  value={toMonth}
+                  onChange={(e) => setToMonth(e.target.value)}
+                  disabled={botLoading}
+                  className="w-full bg-slate-950 border border-slate-700 text-cyan-300 text-xs font-bold rounded-xl px-3 py-2.5 focus:outline-none focus:border-cyan-500 cursor-pointer"
+                >
+                  {MONTH_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Status Feedback */}
+            {botStatus && (
+              <div className={`p-3 rounded-xl text-xs mb-5 flex items-center gap-2 ${
+                fetchedPrimaryResult ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-300' : 'bg-slate-950 border border-slate-800 text-cyan-300'
+              }`}>
+                {botLoading ? <Loader2 size={16} className="animate-spin text-cyan-400" /> : <Check size={16} className="text-emerald-400" />}
+                <span>{botStatus}</span>
+              </div>
+            )}
+
+            {/* Fetched Data Summary Box */}
+            {fetchedPrimaryResult && (
+              <div className="mb-5 p-4 bg-slate-950 rounded-2xl border border-emerald-500/40 space-y-2 text-xs">
+                <div className="font-bold text-emerald-400 flex items-center justify-between border-b border-slate-800 pb-2">
+                  <span>🎉 Successfully Extracted from CBO!</span>
+                  <span>{fetchedPrimaryResult.count} Products</span>
+                </div>
+                <div className="flex justify-between text-slate-300 pt-1">
+                  <span>Total Primary Qty:</span>
+                  <span className="font-mono font-bold text-cyan-400 text-sm">{fetchedPrimaryResult.total_qty.toLocaleString()} Units</span>
+                </div>
+                <div className="flex justify-between text-slate-300">
+                  <span>Total Primary Value:</span>
+                  <span className="font-mono font-bold text-emerald-400 text-sm">₹ {Math.round(fetchedPrimaryResult.total_value).toLocaleString()}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => { setShowCboModal(false); setFetchedPrimaryResult(null); }}
+                disabled={botLoading}
+                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              {!fetchedPrimaryResult ? (
+                <button
+                  type="button"
+                  onClick={handleTriggerBot}
+                  disabled={botLoading}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-cyan-500/20 transition cursor-pointer"
+                >
+                  {botLoading ? <Loader2 size={16} className="animate-spin" /> : <Bot size={16} />}
+                  {botLoading ? 'Fetching from CBO...' : 'Fetch from CBO ERP'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleApplyImport}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-extrabold rounded-xl shadow-lg shadow-emerald-500/20 transition cursor-pointer"
+                >
+                  <CheckCircle2 size={16} /> Import into Workspace
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: SINGLE PRODUCT PARTY BREAKDOWN */}
       {selectedProductForModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
