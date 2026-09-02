@@ -12,28 +12,28 @@ export async function onRequest(context: any) {
 
   try {
     const body = await context.request.json();
-    const apiRes = await fetch("https://organic-parakeet-gx7rv659gjp5f97qv-8000.app.github.dev/api/fetch-primary", {
+    const apiRes = await fetch("https://organic-parakeet-gx7rv659gjp5f97qv-8000.app.github.dev/api/download-primary-excel", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Accept": "application/json",
       },
       body: JSON.stringify(body),
     });
 
-    const data = await apiRes.text();
+    const blob = await apiRes.arrayBuffer();
 
-    return new Response(data, {
+    return new Response(blob, {
       status: apiRes.status,
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/vnd.ms-excel",
+        "Content-Disposition": "attachment; filename=CBO_Primary_Report.xls",
         "Access-Control-Allow-Origin": "*",
       },
     });
   } catch (err: any) {
     return new Response(JSON.stringify({
       success: false,
-      error: "Connection error: " + (err.message || String(err))
+      error: "Download error: " + (err.message || String(err))
     }), {
       status: 502,
       headers: {
