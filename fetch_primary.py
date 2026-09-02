@@ -1,192 +1,175 @@
-import os, sys, time, csv
+import sys, time, os, csv
 from playwright.sync_api import sync_playwright
 
 MONTH_TARGET = sys.argv[1] if len(sys.argv) > 1 else "Aug-2026"
 FY_TARGET = "2026-2027"
-
 CBO_USER = os.getenv("CBO_USER", "6958BANWARI")
 CBO_PASS = os.getenv("CBO_PASS", "6958")
-
-SESSION_FILE = "cbo_session.json"
 LOGIN_URL = "https://dios.myreporting.net/erp/login"
 DIRECT_REPORT_URL = f"https://dios.myreporting.net/RPT/PerformanceReview.aspx?format=Primary%20Sales&wise=P&DOC_TYPE=SS&RPT_HEADER=Monthly%20Sales-Summary&CBOYN=Y&FY_YEAR={FY_TARGET}&COMPANY_CODE=DIOS&PA_ID=6958&DESIG_ID=1&DESIG=BE&PA_NAME=BANWARI%20LAL%20MEENA&HEAD_QTR=UDAIPUR&DIVISION_NAME=DIOS%20GROUP&FMCGYN=N&MENU_STYLE=NONE&ACTION_FROM=ANDROID&LOGIN_PA_ID=6958&LOGIN_COMPANY_ID=1"
 
-os.makedirs("csv_output", exist_ok=True)
-
-print("="*65)
-print(f"🤖 DIOS CBO ERP BOT: Exporting Primary Data [{MONTH_TARGET}]")
-print("="*65)
+os.makedirs("/workspaces/Dios/csv_output", exist_ok=True)
 
 with sync_playwright() as p:
-    browser = p.chromium.launch(
-        headless=True,
-        args=["--disable-popup-blocking", "--no-sandbox", "--disable-web-security"]
-    )
-    
-    storage = SESSION_FILE if os.path.exists(SESSION_FILE) else None
-    if storage:
-        print("🔑 Using saved session...")
-        context = browser.new_context(storage_state=storage, viewport={"width": 1440, "height": 900}, accept_downloads=True)
-    else:
-        print("⚡ Clean Session initialized...")
-        context = browser.new_context(viewport={"width": 1440, "height": 900}, accept_downloads=True)
-
+    browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
+    context = browser.new_context(viewport={'width': 1440, 'height': 900}, accept_downloads=True)
     page = context.new_page()
-    page.on("dialog", lambda dialog: dialog.accept())
+    page.on('dialog', lambda d: d.accept())
 
-    try:
-        # STEP 1: Check Login
-        print("\n[1/5] Checking Login Status...")
-        page.goto(LOGIN_URL, timeout=60000, wait_until="networkidle")
-        page.wait_for_timeout(1000)
+    print("[1] Logging into CBO...")
+    page.goto(LOGIN_URL, timeout=60000, wait_until="domcontentloaded")
+    page.wait_for_timeout(1500)
+    page.fill("input[type='text']", CBO_USER)
+    page.fill("input[type='password']", CBO_PASS)
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(3500)
 
-        if "login" in page.url.lower() or page.locator("input[type='password']").count() > 0:
-            print("🔑 Performing Login...")
-            page.fill("input[type='text']:visible", CBO_USER)
-            page.fill("input[type='password']:visible", CBO_PASS)
-            
-            login_btn = page.locator("button:visible:has-text('Login'), input[type='submit']:visible, .btn-success:visible").first
-            if login_btn.count() > 0:
-                login_btn.click()
-            else:
-                page.keyboard.press("Enter")
+    print("[2] Opening Report...")
+    page.goto(DIRECT_REPORT_URL, timeout=60000, wait_until="domcontentloaded")
+    page.wait_for_timeout(4000)
 
-            page.wait_for_load_state("networkidle")
-            page.wait_for_timeout(3000)
-            context.storage_state(path=SESSION_FILE)
-            print("💾 Session Saved!")
+    form_frame = page.main_frame
+    for f in page.frames:
+        if f.locator('select#MFDATE').count() > 0:
+            form_frame = f
+            break
 
-        # STEP 2: Open Report Form
-        print("\n[2/5] Opening Monthly Sales Report Modal...")
-        page.goto(DIRECT_REPORT_URL, timeout=60000, wait_until="domcontentloaded")
-        page.wait_for_timeout(3500)
-
-        # STEP 3: Find Frame & Set Month Dropdowns
-        print(f"\n[3/5] Selecting Month [{MONTH_TARGET}]...")
-        target_frame = None
-        for f in page.frames:
-            try:
-                has_selects = f.evaluate("""(target) => {
-                    const selects = Array.from(document.querySelectorAll('select'));
-                    const mSelects = selects.filter(s => Array.from(s.options).some(o => o.text.includes('202') || o.text.includes('Aug') || o.text.includes('Apr')));
-                    if (mSelects.length >= 2) {
-                        for (let opt of mSelects[0].options) {
-                            if (opt.text.toLowerCase().includes(target.toLowerCase()) || opt.text.toLowerCase().includes(target.substring(0,3).toLowerCase())) {
-                                mSelects[0].value = opt.value;
-                                mSelects[0].dispatchEvent(new Event('change', { bubbles: true }));
-                                break;
-                            }
-                        }
-                        for (let opt of mSelects[1].options) {
-                            if (opt.text.toLowerCase().includes(target.toLowerCase()) || opt.text.toLowerCase().includes(target.substring(0,3).toLowerCase())) {
-                                mSelects[1].value = opt.value;
-                                mSelects[1].dispatchEvent(new Event('change', { bubbles: true }));
-                                break;
-                            }
-                        }
-                        return true;
-                    }
-                    return false;
-                }""", MONTH_TARGET)
-                if has_selects:
-                    target_frame = f
-                    print(f"🎯 Month set in frame: '{f.name or 'main'}'")
-                    break
-            except Exception:
-                pass
-
-        if not target_frame:
-            target_frame = page.main_frame
-
-        # STEP 4: Click [Go] Button
-        print("\n[4/5] Clicking [Go] Button...")
-        out_excel = f"csv_output/Primary_{MONTH_TARGET}.xlsx"
-        out_csv = f"csv_output/Primary_{MONTH_TARGET}.csv"
-
-        active_page = page
-        try:
-            with context.expect_page(timeout=5000) as popup_info:
-                target_frame.evaluate("""() => {
-                    const btns = Array.from(document.querySelectorAll('button, input, a'));
-                    const go = btns.find(b => (b.innerText || b.value || '').trim().toLowerCase() === 'go' || b.id.toLowerCase().includes('btngo'));
-                    if (go) go.click();
-                }""")
-            active_page = popup_info.value
-            print("🪟 Switched to Report Window!")
-        except Exception:
-            target_frame.evaluate("""() => {
-                const btns = Array.from(document.querySelectorAll('button, input, a'));
-                const go = btns.find(b => (b.innerText || b.value || '').trim().toLowerCase() === 'go' || b.id.toLowerCase().includes('btngo'));
-                if (go) go.click();
-            }""")
-
-        # Wait for Report Table
-        print("⏳ Waiting for Report Table to Load...")
-        active_page.wait_for_load_state("domcontentloaded")
-        active_page.wait_for_timeout(6000)
-        active_page.screenshot(path="csv_output/report_screen.png")
-
-        # STEP 5: Download Official Excel & Scrape Table
-        print("\n[5/5] Downloading Excel & Exporting CSV...")
-
-        # 5a. Direct Excel Button Click
-        excel_downloaded = False
-        for f in active_page.frames:
-            try:
-                excel_btn = f.locator("button:has-text('Excel'), a:has-text('Excel'), :text('Excel')").first
-                if excel_btn.count() > 0 and excel_btn.is_visible():
-                    print("📥 Clicking the blue [Excel] button...")
-                    with active_page.expect_download(timeout=15000) as dl_info:
-                        excel_btn.click(force=True)
-                    dl = dl_info.value
-                    dl.save_as(out_excel)
-                    print(f"🎉 EXCEL DOWNLOADED SUCCESSFULLY: {out_excel}")
-                    excel_downloaded = True
-                    break
-            except Exception as e:
-                print(f"   (Excel download trigger note: {e})")
-
-        # 5b. Extract the Table directly from the screen
-        print("📊 Extracting all rows from the Primary Sales table...")
-        scraped_products = []
-
-        for f in active_page.frames:
-            rows = f.evaluate("""() => {
-                const result = [];
-                const allRows = Array.from(document.querySelectorAll('tr'));
-                for (let r of allRows) {
-                    const cells = Array.from(r.querySelectorAll('td, th')).map(c => c.innerText.trim());
-                    if (cells.length >= 2) {
-                        result.push(cells);
-                    }
+    print(f"[3] Selecting Month [{MONTH_TARGET}] and Product Wise...")
+    form_frame.evaluate('''(target) => {
+        const selectByText = (sel, textMatch) => {
+            if (!sel) return;
+            for (let o of sel.options) {
+                if (o.text.toLowerCase().includes(textMatch.toLowerCase()) || o.text.toLowerCase().includes(target.substring(0,3).toLowerCase())) {
+                    sel.value = o.value;
+                    sel.dispatchEvent(new Event('change', {bubbles: true}));
+                    break;
                 }
-                return result;
-            }""")
+            }
+        };
 
-            for r in rows:
-                if len(r) >= 2:
-                    p_name = r[0]
-                    # Filter only actual products (skip title/headers/counts)
-                    if p_name and not p_name.upper().startswith("PRODUCT") and not p_name.upper().startswith("COUNT") and not p_name.upper().startswith("PRIMARY"):
-                        scraped_products.append(r)
+        const selects = Array.from(document.querySelectorAll('select'));
+        selects.forEach(s => {
+            const id = (s.id || s.name || '').toUpperCase();
+            if (id.includes('FDATE')) selectByText(s, target);
+            if (id.includes('TDATE')) selectByText(s, target);
+            if (id.includes('GROUPING') || id.includes('WISE')) selectByText(s, 'Product');
+            if (id.includes('FORMAT')) selectByText(s, 'Primary');
+        });
+    }''', MONTH_TARGET)
 
-        if len(scraped_products) > 0:
-            with open(out_csv, "w", newline="", encoding="utf-8") as f:
-                writer = csv.writer(f)
-                writer.writerow(["PRODUCT NAME", "PRIMARY QTY", "PRIMARY VALUE"])
-                for sp in scraped_products:
-                    writer.writerow([sp[0], sp[1] if len(sp) > 1 else "0", sp[2] if len(sp) > 2 else "0"])
-            print(f"🎉 CSV FILE CREATED: {out_csv} ({len(scraped_products)} Products extracted!)")
-            print("\n📋 Top 10 Products Preview:")
-            for p in scraped_products[:10]:
-                print(f"   • {p[0]:<30} | Qty: {p[1]:<6} | Value: ₹{p[2] if len(p) > 2 else '0'}")
-        else:
-            print("⚠️ Table not found. Please check 'csv_output/report_screen.png'")
+    time.sleep(1)
 
-    except Exception as err:
-        print(f"\n❌ Error: {err}")
-    finally:
-        browser.close()
-        print("\n" + "="*65)
-        print("🏁 Bot Finished Execution.")
-        print("="*65)
+    print("[4] Submitting Form...")
+    active_page = page
+    try:
+        with context.expect_page(timeout=5000) as popup_info:
+            form_frame.evaluate('''() => {
+                const btn = document.getElementById('btnGo1') || document.getElementById('btnGo') || document.querySelector("button:has-text('Go'), input[value*='Go']");
+                if (btn) btn.click();
+            }''')
+        active_page = popup_info.value
+    except Exception:
+        form_frame.evaluate('''() => {
+            const btn = document.getElementById('btnGo1') || document.getElementById('btnGo') || document.querySelector("button:has-text('Go'), input[value*='Go']");
+            if (btn) btn.click();
+        }''')
+
+    active_page.wait_for_load_state("domcontentloaded")
+    time.sleep(6)
+
+    # Click UDAIPUR link using JS evaluation (bypasses any modal/backdrop blocker)
+    print("[5] Expanding UDAIPUR to view Products...")
+    clicked_drilldown = False
+    for f in active_page.frames:
+        clicked_drilldown = f.evaluate('''() => {
+            const links = Array.from(document.querySelectorAll('a, span, td'));
+            const uLink = links.find(el => el.innerText && el.innerText.trim().toUpperCase() === 'UDAIPUR');
+            if (uLink) {
+                uLink.click();
+                return true;
+            }
+            return false;
+        }''')
+        if clicked_drilldown:
+            print("👉 Clicked UDAIPUR link successfully!")
+            time.sleep(5)
+            break
+
+    # Download Excel from top right button
+    print("[6] Downloading Excel...")
+    excel_path = f"/workspaces/Dios/csv_output/Primary_{MONTH_TARGET}.xls"
+    for f in active_page.frames:
+        try:
+            excel_btn = f.locator("a:has-text('Excel'), button:has-text('Excel'), [id*='Excel'], [id*='excel'], img[title*='Excel']").first
+            if excel_btn.count() > 0:
+                with active_page.expect_download(timeout=15000) as dl_info:
+                    f.evaluate('''() => {
+                        const btn = Array.from(document.querySelectorAll('a, button, input, img')).find(e => 
+                            (e.innerText || e.value || e.title || e.id || '').toLowerCase().includes('excel')
+                        );
+                        if (btn) btn.click();
+                    }''')
+                dl = dl_info.value
+                dl.save_as(excel_path)
+                print(f"🎉 EXCEL DOWNLOADED TO: {excel_path}")
+                break
+        except Exception as e:
+            print("Excel click info:", e)
+
+    # Scrape Table accurately
+    print("[7] Extracting Clean Product Data...")
+    extracted_items = []
+    for f in active_page.frames:
+        table_data = f.evaluate('''() => {
+            const result = [];
+            const trs = Array.from(document.querySelectorAll('tr'));
+            for (let tr of trs) {
+                const cells = Array.from(tr.querySelectorAll('td, th')).map(c => c.innerText.trim());
+                if (cells.length >= 2) {
+                    result.push(cells);
+                }
+            }
+            return result;
+        }''')
+
+        for r in table_data:
+            # Check for standard product row [Product Name, Qty, Value]
+            first_cell = r[0]
+            if not first_cell:
+                continue
+            if any(k in first_cell.upper() for k in ['PRODUCT', 'COUNT', 'PRIMARY SALES', 'TOTAL', 'MONTHLY SALES', 'HEAD QTR', 'OPTIONS', 'COLUMNS', 'EXCEL', 'PDF', 'S.N']):
+                continue
+            
+            # Find the numeric cells
+            nums = []
+            for c in r[1:]:
+                clean_c = c.replace(',', '').replace('₹', '').strip()
+                try:
+                    nums.append(float(clean_c))
+                except ValueError:
+                    pass
+
+            if len(nums) >= 2:
+                qty = nums[0]
+                val = nums[1]
+                extracted_items.append({'name': first_cell, 'qty': qty, 'value': val})
+            elif len(nums) == 1:
+                extracted_items.append({'name': first_cell, 'qty': nums[0], 'value': 0})
+
+    if len(extracted_items) > 0:
+        csv_path = f"/workspaces/Dios/csv_output/Primary_Live_{MONTH_TARGET}.csv"
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["PRODUCT NAME", "PRIMARY QTY", "PRIMARY VALUE"])
+            for it in extracted_items:
+                writer.writerow([it["name"], it["qty"], it["value"]])
+        print(f"✅ Extracted {len(extracted_items)} Products into: {csv_path}")
+        print("\n--- First 5 Products Preview ---")
+        for it in extracted_items[:5]:
+            print(f"  • {it['name']} | Qty: {it['qty']} | Value: ₹{it['value']}")
+    else:
+        print("⚠️ No products extracted. Capturing screen...")
+        active_page.screenshot(path="/workspaces/Dios/csv_output/cbo_after_drilldown.png")
+
+    browser.close()
+    print("\n🏁 Done!")
