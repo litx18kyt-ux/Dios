@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, FolderGit2, ChevronRight, Activity, ShieldCheck } from 'lucide-react';
+import { Search, FolderGit2, ChevronRight, Activity, ShieldCheck, Database, FileText } from 'lucide-react';
 
 interface Props {
   onOpenProject: (projectId: string) => void;
@@ -11,10 +11,10 @@ export const MainHub: React.FC<Props> = ({ onOpenProject }) => {
   const projects = [
     {
       id: 'dios',
-      name: 'dios',
-      description: 'Unit Sales Progression (HQ Total) aggregator for Nagda, Dwarika, Sun, RP, Modi & Vardhman.',
+      name: 'DIOS Pharma Suite',
+      description: 'Centralized Pharma Sales Automation & Review System for Udaipur HQ.',
       category: 'Pharma Analytics',
-      status: 'Live (v26.0 2-Tier Breakdown)'
+      status: 'Live (v52.0 Production)'
     }
   ];
 
@@ -25,7 +25,7 @@ export const MainHub: React.FC<Props> = ({ onOpenProject }) => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-12 max-w-6xl mx-auto">
-      {/* 🚀 LIVE V26.0 BANNER */}
+      {/* 🚀 TOP BANNER */}
       <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-cyan-950 via-slate-900 to-emerald-950 border border-cyan-500/40 shadow-xl flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
@@ -33,11 +33,11 @@ export const MainHub: React.FC<Props> = ({ onOpenProject }) => {
           </span>
           <div>
             <div className="text-xs font-black tracking-wide text-emerald-400 uppercase flex items-center gap-2">
-              <span>● SYSTEM V26.0 LIVE</span>
-              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-500/30">2-TIER PARTY BREAKDOWN ACTIVE</span>
+              <span>● SYSTEM V52.0 LIVE</span>
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-500/30">DUAL ENGINE READY</span>
             </div>
             <p className="text-xs text-slate-300 mt-0.5">
-              Party Name Banner • SEC & CLOSING Sub-Headers • Side-by-Side Stock & Sales Excel
+              Live CBO Sync • Statement Aggregator • 14 Review Formats
             </p>
           </div>
         </div>
@@ -60,41 +60,68 @@ export const MainHub: React.FC<Props> = ({ onOpenProject }) => {
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
         <input
           type="text"
-          placeholder="Search projects (e.g. dios)..."
+          placeholder="Search modules (e.g. dios, review, aggregator)..."
           value={hubSearch}
           onChange={(e) => setHubSearch(e.target.value)}
           className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-12 pr-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredProjects.map((project) => (
-          <div
-            key={project.id}
-            onClick={() => onOpenProject(project.id)}
-            className="group bg-slate-900/80 border border-slate-800 hover:border-cyan-500 hover:bg-slate-900 rounded-2xl p-6 transition duration-200 cursor-pointer shadow-lg hover:shadow-cyan-500/10 flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-                  Pharma Analytics
-                </span>
-                <ChevronRight size={18} className="text-slate-500 group-hover:text-cyan-400 group-hover:translate-x-1 transition" />
-              </div>
-              <h2 className="text-2xl font-bold text-white group-hover:text-cyan-400 transition mb-2">
-                {project.name}
-              </h2>
-              <p className="text-slate-400 text-sm leading-relaxed">
-                {project.description}
-              </p>
+      {/* Workspace Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Card 1: Statement Aggregator */}
+        <div className="bg-slate-900/80 border border-slate-800 hover:border-cyan-500/60 rounded-2xl p-6 transition duration-200 shadow-xl flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                Primary & Secondary
+              </span>
+              <Database size={20} className="text-cyan-400" />
             </div>
-
-            <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between text-xs">
-              <span className="text-emerald-400 font-medium">{project.status}</span>
-              <span className="text-cyan-400 font-bold group-hover:translate-x-1 transition">Open Workspace &rarr;</span>
-            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">
+              Statement Aggregator
+            </h2>
+            <p className="text-slate-400 text-sm leading-relaxed mb-4">
+              Unit Sales Progression (HQ Total) aggregator for 6 Distributors + Live CBO Primary Dispatch (Dual Engine: Web Scraper & CBO Excel).
+            </p>
           </div>
-        ))}
+
+          <div className="pt-4 border-t border-slate-800">
+            <button
+              onClick={() => onOpenProject('dios-aggregator')}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-cyan-600/20 transition cursor-pointer"
+            >
+              Open Statement Aggregator &rarr;
+            </button>
+          </div>
+        </div>
+
+        {/* Card 2: Data Hub -> Review Format */}
+        <div className="bg-slate-900/80 border border-slate-800 hover:border-emerald-500/60 rounded-2xl p-6 transition duration-200 shadow-xl flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                Data Hub
+              </span>
+              <FileText size={20} className="text-emerald-400" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">
+              Performance Review
+            </h2>
+            <p className="text-slate-400 text-sm leading-relaxed mb-4">
+              Access and manage all 14 Monthly Performance Review formats (Effort Level, Sales Performance, ROI, MSL, Camp Details & more).
+            </p>
+          </div>
+
+          <div className="pt-4 border-t border-slate-800">
+            <button
+              onClick={() => onOpenProject('dios-review')}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/20 transition cursor-pointer"
+            >
+              📊 Open Review Format &rarr;
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

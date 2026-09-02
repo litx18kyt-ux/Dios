@@ -1,0 +1,11 @@
+{
+  "windowRoutes": [
+    "navigation",
+    "navigator",
+    "cboVariables"
+  ],
+  "actionbar_snippets": [
+    "37688),e.e(76201),e.e(62877),e.e(47825),e.e(48286),e.e(57087),e.e(99904),e.e(84471),e.e(66186),e.e(61151),e.e(74911),e.e(25488),e.e(23288)]).then(e.bind(e,60910)).then(f=>f.HomeFormComponent)},{path:\"reportwithactionbar\",loadChildren:()=>Promise.all([e.e(90327),e.e(58897),e.e(18769),e.e(92698),e.e(91092),e.e(77440),e.e(51106),e.e(56978),e.e(63656),e.e(97204),e.e(54911),e.e(39493),e.e(68592),e.e(19828)]).then(e.bind(e,22647)).then(f=>f.DataGridWithActionBarFormComponent)},{path:\"editgrid\",loadChi",
+    "63656),e.e(18149),e.e(16136),e.e(26455),e.e(83155),e.e(84314),e.e(48286),e.e(72099),e.e(10823),e.e(99036),e.e(2805),e.e(68592),e.e(83643)]).then(e.bind(e,20768)).then(f=>f.HomeFormMComponent)},{path:\"reportwithactionbar\",loadChildren:()=>Promise.all([e.e(90327),e.e(58897),e.e(18769),e.e(92698),e.e(91092),e.e(77440),e.e(51106),e.e(56978),e.e(63656),e.e(87836),e.e(54911),e.e(42865),e.e(40341),e.e(68592),e.e(79404)]).then(e.bind(e,16314)).then(f=>f.DataGridWithActionBarFormMComponent)},{path:\"editg"
+  ]
+}

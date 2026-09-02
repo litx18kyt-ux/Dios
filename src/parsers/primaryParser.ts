@@ -4,8 +4,7 @@ import { PartyParseSummary, matchMasterProduct } from './common';
 export async function parsePrimaryFile(file: File, partyName: string = 'Company Primary Dispatch'): Promise<PartyParseSummary> {
   const items: Record<number, { sales: number; closing: number }> = {};
   let count = 0;
-  let totalSales = 0; // Represents Primary Qty (NET PRI)
-  let totalClosing = 0;
+  let totalSales = 0;
 
   const arrayBuffer = await file.arrayBuffer();
   const wb = XLSX.read(arrayBuffer, { type: 'array' });
@@ -14,9 +13,9 @@ export async function parsePrimaryFile(file: File, partyName: string = 'Company 
 
   let prodCol = 0;
   let priQtyCol = 1;
-  let startRow = 1;
+  let startRow = 0;
 
-  for (let r = 0; r < Math.min(rows.length, 12); r++) {
+  for (let r = 0; r < Math.min(rows.length, 15); r++) {
     const row = rows[r] || [];
     const rowStr = row.map(c => String(c || '').toUpperCase()).join(' | ');
 
@@ -25,7 +24,7 @@ export async function parsePrimaryFile(file: File, partyName: string = 'Company 
       row.forEach((cell, idx) => {
         const c = String(cell || '').toUpperCase().trim();
         if (c.includes('PRODUCT')) prodCol = idx;
-        if (c.includes('PRIMARY QTY') || (c.includes('QTY') && !c.includes('VAL'))) priQtyCol = idx;
+        if (c.includes('PRIMARY QTY') || (c.includes('QTY') && !c.includes('VAL') && !c.includes('RATE'))) priQtyCol = idx;
       });
       break;
     }
@@ -36,17 +35,18 @@ export async function parsePrimaryFile(file: File, partyName: string = 'Company 
     if (!row || row.length === 0) continue;
 
     const rawProd = String(row[prodCol] || '').trim();
-    if (!rawProd || rawProd.toUpperCase().includes('TOTAL') || rawProd.toUpperCase().includes('COUNT') || rawProd.toUpperCase().includes('PRIMARY SALES')) continue;
+    if (!rawProd || rawProd.toUpperCase().includes('TOTAL') || rawProd.toUpperCase().includes('COUNT') || rawProd.toUpperCase().includes('PRIMARY SALES') || rawProd.toUpperCase().includes('HEAD QTR') || rawProd.toUpperCase().includes('UDAIPUR')) continue;
 
     const matched = matchMasterProduct(rawProd);
     if (matched) {
-      const priQty = parseFloat(String(row[priQtyCol] || '0').replace(/,/g, '')) || 0;
+      let qtyStr = String(row[priQtyCol] !== undefined ? row[priQtyCol] : row[1] || '0').replace(/,/g, '').trim();
+      let priQty = parseFloat(qtyStr);
+      if (isNaN(priQty)) priQty = 0;
 
       if (!items[matched.sn]) {
         items[matched.sn] = { sales: 0, closing: 0 };
         count++;
       }
-      // sales field stores Primary Qty (NET PRI)
       items[matched.sn].sales += priQty;
       totalSales += priQty;
     }
@@ -56,7 +56,7 @@ export async function parsePrimaryFile(file: File, partyName: string = 'Company 
     partyName,
     fileName: file.name,
     itemCount: count,
-    totalSales, // Total Primary Qty
+    totalSales,
     totalClosing: 0,
     items,
   };

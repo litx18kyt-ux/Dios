@@ -2,10 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { 
   ArrowLeft, Upload, FileSpreadsheet, Download, CheckCircle2, 
   Trash2, Eye, X, RefreshCw, Layers, Building2, Search, Calculator,
-  Package, Bot, Sparkles, Check, Loader2, Calendar, AlertTriangle, FileDown
+  Package, Bot, Sparkles, Check, Loader2, Calendar, AlertTriangle, FileSpreadsheet as ExcelIcon
 } from 'lucide-react';
 import { MASTER_PRODUCTS } from '../data/masterProducts';
-import { parsePartyFile, PartyParseSummary, matchMasterProduct } from '../parsers';
+import { parsePartyFile, parsePrimaryFile, PartyParseSummary, matchMasterProduct } from '../parsers';
 import { exportToExcel } from '../utils/excelExporter';
 import { AggregatedProduct } from '../parsers/common';
 
@@ -73,7 +73,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
   const [fromMonth, setFromMonth] = useState('Aug-2026');
   const [toMonth, setToMonth] = useState('Aug-2026');
   const [botLoading, setBotLoading] = useState(false);
-  const [excelDownloading, setExcelDownloading] = useState(false);
+  const [excelLoading, setExcelLoading] = useState(false);
   const [botStatus, setBotStatus] = useState<string>('');
   const [botError, setBotError] = useState<string | null>(null);
 
@@ -168,10 +168,10 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
     }
   };
 
-  // Option 1: 1-Click Live JSON Auto-Sync
+  // Method 1: Live JSON Web Scraper Auto-Fill
   const handleTriggerLiveSync = async () => {
     setBotLoading(true);
-    setBotStatus('Live fetching data from CBO...');
+    setBotStatus('Fetching live data via CBO Scraper...');
     setBotError(null);
 
     const payload = {
@@ -205,7 +205,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         });
 
         const parsedSummary: PartyParseSummary = {
-          partyName: 'Company Primary Dispatch (Live CBO)',
+          partyName: 'Company Primary Dispatch (Live CBO JSON)',
           fileName: `CBO_${fromMonth}_to_${toMonth}`,
           itemCount: matchedCount,
           totalSales: resultData.total_qty,
@@ -235,11 +235,11 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
     }
   };
 
-  // Option 2: Direct Download CBO Excel file
-  const handleDownloadCboExcel = async () => {
-    setExcelDownloading(true);
+  // Method 2: Fetch CBO Excel in Background & Auto-Parse
+  const handleFetchAndParseCboExcel = async () => {
+    setExcelLoading(true);
     setBotError(null);
-    setBotStatus('Connecting to CBO to download Excel...');
+    setBotStatus('Bot is downloading CBO Excel file & auto-parsing...');
 
     try {
       const payload = {
@@ -248,29 +248,34 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         fy_year: '2026-2027'
       };
 
-      const res = await fetch('/api/download-primary-excel', {
+      const res = await fetch('/api/fetch-cbo-excel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
-      if (!res.ok) throw new Error('Failed to generate Excel from CBO.');
+      if (!res.ok) throw new Error('CBO Excel download failed.');
 
       const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `CBO_Primary_${fromMonth}.xls`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      a.remove();
+      const excelFile = new File([blob], `CBO_Primary_${fromMonth}.xls`, { type: 'application/vnd.ms-excel' });
 
-      setBotStatus('🎉 CBO Excel file downloaded successfully!');
+      // Run our internal excel parser
+      const parsedSummary = await parsePrimaryFile(excelFile, 'Company Primary Dispatch (Live CBO Excel)');
+
+      setPrimaryData(parsedSummary);
+
+      const monthPrefix = fromMonth.split('-')[0].toUpperCase();
+      const targetFullMonth = MONTH_MAP_REVERSE[monthPrefix] || 'AUGUST';
+      setSelectedMonth(targetFullMonth);
+
+      setBotStatus(`🎉 SUCCESS! Parsed ${parsedSummary.itemCount} Products (${parsedSummary.totalSales} Units) from Excel!`);
+      setTimeout(() => {
+        setShowCboModal(false);
+      }, 1000);
     } catch (err: any) {
-      setBotError(err.message || 'Excel download failed.');
+      setBotError(err.message || 'Excel auto-fetch failed.');
     } finally {
-      setExcelDownloading(false);
+      setExcelLoading(false);
     }
   };
 
@@ -311,7 +316,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         
         <div className="flex items-center gap-3">
           <span className="text-[11px] bg-cyan-950 text-cyan-300 border border-cyan-500/40 px-3 py-1 rounded-full font-mono font-bold flex items-center gap-1.5 shadow-lg shadow-cyan-950/50">
-            <Sparkles size={13} className="text-cyan-400 animate-pulse" /> DIOS V50.0 (DUAL PRIMARY ENGINE)
+            <Sparkles size={13} className="text-cyan-400 animate-pulse" /> DIOS V51.0 (DUAL LIVE CBO ENGINE)
           </span>
           <span className="text-xs text-slate-400 font-medium">Month:</span>
           <select
@@ -377,8 +382,8 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
               </h3>
               <p className="text-xs text-slate-400">
                 {primaryData 
-                  ? `Active Data: ${primaryData.fileName} • Total: ${primaryData.totalSales.toLocaleString()} Units`
-                  : 'Live 1-Click Sync, Official Excel Fetch, or Local Upload'}
+                  ? `Active: ${primaryData.fileName} • Total: ${primaryData.totalSales.toLocaleString()} Units`
+                  : 'Live 1-Click Auto Sync (JSON / Excel) or Local File Upload'}
               </p>
             </div>
           </div>
@@ -393,7 +398,6 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
               </button>
             ) : (
               <>
-                {/* 1-Click Live Sync */}
                 <button
                   onClick={() => setShowCboModal(true)}
                   className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-cyan-500/20 transition cursor-pointer"
@@ -401,7 +405,6 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
                   <Bot size={15} /> ⚡ Live CBO Fetch
                 </button>
 
-                {/* Upload Local File */}
                 <label className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer">
                   <Upload size={14} /> Upload File
                   <input
@@ -628,7 +631,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         </table>
       </div>
 
-      {/* 🤖 DUAL OPTION MODAL: CBO SYNC & DOWNLOAD */}
+      {/* 🤖 DUAL OPTION MODAL: CBO SYNC */}
       {showCboModal && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-cyan-500/30 rounded-3xl max-w-lg w-full p-6 shadow-2xl shadow-cyan-950/60">
@@ -639,9 +642,9 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
                 </span>
                 <div>
                   <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    CBO Primary Sales Control
+                    CBO Primary Sales Auto-Sync
                   </h3>
-                  <p className="text-xs text-slate-400">Choose between Live JSON Sync or Direct Excel Download</p>
+                  <p className="text-xs text-slate-400">Select Month & Choose Auto-Fetch Mode</p>
                 </div>
               </div>
               <button 
@@ -661,7 +664,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
                 <select
                   value={fromMonth}
                   onChange={(e) => setFromMonth(e.target.value)}
-                  disabled={botLoading || excelDownloading}
+                  disabled={botLoading || excelLoading}
                   className="w-full bg-slate-950 border border-slate-700 text-cyan-300 text-xs font-bold rounded-xl px-3 py-2.5 focus:outline-none focus:border-cyan-500 cursor-pointer"
                 >
                   {MONTH_OPTIONS.map(opt => (
@@ -677,7 +680,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
                 <select
                   value={toMonth}
                   onChange={(e) => setToMonth(e.target.value)}
-                  disabled={botLoading || excelDownloading}
+                  disabled={botLoading || excelLoading}
                   className="w-full bg-slate-950 border border-slate-700 text-cyan-300 text-xs font-bold rounded-xl px-3 py-2.5 focus:outline-none focus:border-cyan-500 cursor-pointer"
                 >
                   {MONTH_OPTIONS.map(opt => (
@@ -690,7 +693,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
             {/* Status Feedback */}
             {botStatus && !botError && (
               <div className="p-3.5 rounded-xl text-xs mb-4 bg-slate-950 border border-slate-800 text-cyan-300 flex items-center gap-2">
-                {(botLoading || excelDownloading) ? <Loader2 size={16} className="animate-spin text-cyan-400" /> : <Check size={16} className="text-emerald-400" />}
+                {(botLoading || excelLoading) ? <Loader2 size={16} className="animate-spin text-cyan-400" /> : <Check size={16} className="text-emerald-400" />}
                 <span>{botStatus}</span>
               </div>
             )}
@@ -712,19 +715,19 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
               <button
                 type="button"
-                onClick={handleDownloadCboExcel}
-                disabled={botLoading || excelDownloading}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition cursor-pointer"
+                onClick={handleFetchAndParseCboExcel}
+                disabled={botLoading || excelLoading}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/40 text-emerald-300 text-xs font-bold rounded-xl transition cursor-pointer"
               >
-                {excelDownloading ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} />}
-                {excelDownloading ? 'Downloading...' : '📥 Download CBO Excel'}
+                {excelLoading ? <Loader2 size={15} className="animate-spin" /> : <ExcelIcon size={15} />}
+                {excelLoading ? 'Parsing Excel...' : '📊 Via CBO Excel'}
               </button>
 
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => { setShowCboModal(false); setBotError(null); }}
-                  disabled={botLoading || excelDownloading}
+                  disabled={botLoading || excelLoading}
                   className="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
                 >
                   Cancel
@@ -733,11 +736,11 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
                 <button
                   type="button"
                   onClick={handleTriggerLiveSync}
-                  disabled={botLoading || excelDownloading}
+                  disabled={botLoading || excelLoading}
                   className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-cyan-500/20 transition cursor-pointer"
                 >
                   {botLoading ? <Loader2 size={15} className="animate-spin" /> : <Bot size={15} />}
-                  {botLoading ? 'Syncing...' : '⚡ Auto-Fill Table'}
+                  {botLoading ? 'Syncing...' : '⚡ Via Web Scraper'}
                 </button>
               </div>
             </div>

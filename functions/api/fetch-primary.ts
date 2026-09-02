@@ -9,26 +9,17 @@ export async function onRequest(context: any) {
       },
     });
   }
-
   try {
     const body = await context.request.json();
     const apiRes = await fetch("https://organic-parakeet-gx7rv659gjp5f97qv-8000.app.github.dev/api/fetch-primary", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-      },
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
       body: JSON.stringify(body),
     });
-
     const data = await apiRes.text();
-
     return new Response(data, {
       status: apiRes.status,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   } catch (err: any) {
     return new Response(JSON.stringify({
@@ -36,10 +27,7 @@ export async function onRequest(context: any) {
       error: "Connection error: " + (err.message || String(err))
     }), {
       status: 502,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   }
 }

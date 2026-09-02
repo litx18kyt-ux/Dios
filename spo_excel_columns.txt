@@ -1,0 +1,14 @@
+DIOS LIFESCIENCES PVT LTD,,,,,,,,,,,,,,,,,,,,
+SPO Stockist Wise Report,,,,,,,,,,,,,,,,,,,,
+ From Date :  01/09/2026 To Date :  03/09/2026 CNF Name :  MODI SALES Rupees/Lakh :  Rupees Transaction Type :  Transactional Party Value Type :  Amount Division Column Required :  No Sale Share Type :  Total Of Head Qtr,,,,,,,,,,,,,,,,,,,,
+Print Date & Time: 02/09/2026 20:06,,,,,,,,,,,,,,,,,,,,
+SrNo,Stockist,Stockist Code,Head Qtr,Sales Amount,Sales Return,,,Breakage Return,Expiry Return,Quality Return,Breakage Expiry,Credit Note Other,Credit Note Tax Diff.,Net Sales,Sec. Sales,Receipt,Dishonor,Net Collection,OutStanding,Over Due Outstanding
+,,,,,Goods Return,Rate Diff,Return Total,,,,,,,,,,,,,
+1,NAGDA DISTRIBUTORS,,UDAIPUR,,,,,,,,,,,,,,,," 1,47,941","1,59,74,942"
+2,R.P.AGENCIES,,UDAIPUR,,,,,,,,,,,,,,,,"44,836"," 13,47,144"
+3,SHREE VARDHMAN PHARMA,,UDAIPUR,,,,,,,,,,,,,,,," 1,50,339"," 65,18,880"
+4,SUN DISTRIBUTORS,,UDAIPUR,,,,,,,,,,,,,,,,"98,196"," 46,11,605"
+5,MODI DISTRIBUTORS,,UDAIPUR,,,,,,,,,,,,,,,," 4,80,767","1,02,95,787"
+6,DWARIKA MEDICALS,,UDAIPUR,,,,,,,,,,,,,,,," 4,18,086"," 22,50,530"
+, Total, , , 0, 0.00, 0.00, 0, 0.00, 0.00, 0.00, 0, 0, 0.00, 0, 0, 0, 0, 0.00," 13,40,165"," 4,09,98,888"
+,,,,,,,,,,,,,,,,,,,,
