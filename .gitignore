@@ -4,3 +4,4 @@ dist/
 complete_project_code.txt
 src_code.txt
 *.log
+cbo_session.json
