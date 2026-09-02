@@ -1,0 +1,8 @@
+{
+  "getdatagrid": {
+    "d": "{\"Table\":[{\"HEAD_QTR\":\"UDAIPUR\",\"Primary_Qty_AUG\":1360.0,\"Primary_Value_AUG\":138810.1,\"Primary_Qty_TOT\":1360.0,\"Primary_Value_TOT\":138810.1},{\"HEAD_QTR\":\"UDAIPUR\",\"Primary_Qty_AUG\":1018.0,\"Primary_Value_AUG\":101815.38,\"Primary_Qty_TOT\":1018.0,\"Primary_Value_TOT\":101815.38},{\"HEAD_QTR\":\"UDAIPUR\",\"Primary_Qty_AUG\":552.0,\"Primary_Value_AUG\":54954.11,\"Primary_Qty_TOT\":552.0,\"Primary_Value_TOT\":54954.11},{\"HEAD_QTR\":\"UDAIPUR\",\"Primary_Qty_AUG\":-14.0,\"Primary_Value_AUG\":-9.83,\"Primary_Qty_TOT\":-14.0,\"Primary_Value_TOT\":-9.83},{\"HEAD_QTR\":\"UDAIPUR\",\"Primary_Qty_AUG\":875.0,\"Primary_Value_AUG\":83671.6,\"Primary_Qty_TOT\":875.0,\"Primary_Value_TOT\":83671.6},{\"HEAD_QTR\":\"UDAIPUR\",\"Primary_Qty_AUG\":403.0,\"Primary_Value_AUG\":53030.2,\"Primary_Qty_TOT\":403.0,\"Primary_Value_TOT\":53030.2}],\"Table1\":[{\"REPL_COL\":\"\",\"REPL_COL_TO\":\"\",\"GROUP_COLUMN_CNT\":\"\",\"GROUP_COLUMN_CNT_TYPE\":\"\"}],\"Table2\":[],\"Table3\":[{\"STK_NAME\":\"\",\"POSTING_ID\":\"\"}],\"Table4\":[{\"STK_NAME\":\"\",\"DOC_TYPE\":\"\",\"POSTING_ID\":\"\"}],\"Table5\":[{\"SN\":1,\"ID\":1,\"COLM_NAME\":\"PRI_QTY\",\"COLM_CAP\":\"Primary Qty\",\"FORMULA_COLYN\":\"\",\"HIDE_COL\":\"\",\"GROUP_COL\":\"\",\"DATA_TYPE\":\"N\"},{\"SN\":2,\"ID\":5,\"COLM_NAME\":\"PRI_VAL\",\"COLM_CAP\":\"Primary Value\",\"FORMULA_COLYN\":\"\",\"HIDE_COL\":\"\",\"GROUP_COL\":\"\",\"DATA_TYPE\":\"N\"}],\"Table6\":[],\"Table7\":[],\"Table8\":[{\"MONTH\":\"2026-08-01T00:00:00\",\"MON\":\"AUG\"},{\"MONTH\":\"2050-01-01T00:00:00\",\"MON\":\"TOT\"}]}"
+  },
+  "grouped": {
+    "d": ""
+  }
+}

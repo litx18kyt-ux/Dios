@@ -11,10 +11,13 @@ export async function onRequest(context: any) {
   }
 
   try {
-    const body = await context.request.json();
-    
-    // Call Render backend from Cloudflare server
-    const renderRes = await fetch("https://dios-xmo1.onrender.com/api/fetch-primary", {
+    let body = {};
+    try {
+      body = await context.request.json();
+    } catch(e) {}
+
+    // Call the verified live Python Playwright Engine
+    const apiRes = await fetch("https://organic-parakeet-gx7rv659gjp5f97qv-8000.app.github.dev/api/fetch-primary", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -23,10 +26,10 @@ export async function onRequest(context: any) {
       body: JSON.stringify(body),
     });
 
-    const data = await renderRes.text();
+    const data = await apiRes.text();
 
     return new Response(data, {
-      status: renderRes.status,
+      status: apiRes.status,
       headers: {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
@@ -35,7 +38,7 @@ export async function onRequest(context: any) {
   } catch (err: any) {
     return new Response(JSON.stringify({
       success: false,
-      error: "Cloudflare-to-Render Bridge error: " + (err.message || "Server starting up. Please retry in 10s.")
+      error: "Bridge connection error: " + (err.message || String(err))
     }), {
       status: 502,
       headers: {

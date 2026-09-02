@@ -2,9 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { 
   ArrowLeft, Upload, FileSpreadsheet, Download, CheckCircle2, 
   Trash2, Eye, X, RefreshCw, Layers, Building2, Search, Calculator,
-  Package, Bot, Sparkles, Check, Loader2, Calendar, AlertTriangle
+  Package, Bot, Sparkles, Check, Loader2, Calendar, AlertTriangle, Terminal
 } from 'lucide-react';
-import { GOOGLE_BOT_URL } from '../config';
 import { MASTER_PRODUCTS } from '../data/masterProducts';
 import { parsePartyFile, PartyParseSummary, matchMasterProduct } from '../parsers';
 import { exportToExcel } from '../utils/excelExporter';
@@ -72,7 +71,6 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
   const [botStatus, setBotStatus] = useState<string>('');
   const [botError, setBotError] = useState<string | null>(null);
   const [botLogs, setBotLogs] = useState<string[]>([]);
-  const [fetchedPrimaryResult, setFetchedPrimaryResult] = useState<any | null>(null);
 
   const activePartyNames = Object.values(partyDataMap).map(p => p.partyName);
 
@@ -165,78 +163,71 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
     }
   };
 
-  // 🤖 1000 IQ LIVE GOOGLE CLOUD CBO BOT TRIGGER
+  // 🤖 1-CLICK FETCH VIA CLOUDFLARE BRIDGE
   const handleTriggerBot = async () => {
     setBotLoading(true);
-    setBotStatus('Google Cloud Bot connecting to CBO ERP...');
+    setBotStatus('Cloudflare Server connecting to CBO...');
     setBotError(null);
-    setBotLogs([]);
-    setFetchedPrimaryResult(null);
+    setBotLogs(['[BRIDGE] Sending request to /api/fetch-primary...']);
+
+    const payload = {
+      from_month: fromMonth,
+      to_month: toMonth,
+      fy_year: '2026-2027'
+    };
 
     try {
-      setBotStatus(`⚡ Google Server authenticating & querying CBO (${fromMonth} to ${toMonth})...`);
-      
-      const res = await fetch(GOOGLE_BOT_URL, {
+      const res = await fetch('/api/fetch-primary', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8',
-        },
-        body: JSON.stringify({
-          from_month: fromMonth,
-          to_month: toMonth,
-          fy_year: '2026-2027'
-        }),
-        redirect: 'follow'
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
 
-      const json = await res.json();
-      if (json.logs) setBotLogs(json.logs);
+      const resultData = await res.json();
       
-      if (!json.success || !json.items || json.items.length === 0) {
-        throw new Error(json.error || '0 products returned. Check logs below.');
+      if (resultData.logs && Array.isArray(resultData.logs)) {
+        setBotLogs(prev => [...prev, ...resultData.logs]);
       }
 
-      setFetchedPrimaryResult(json);
-      setBotStatus(`🎉 SUCCESS! Extracted ${json.count} live products from CBO!`);
+      if (resultData && resultData.success && resultData.items && resultData.items.length > 0) {
+        const itemsMap: Record<number, { sales: number; closing: number }> = {};
+        let matchedCount = 0;
+
+        resultData.items.forEach((scrapedItem: any) => {
+          const matched = matchMasterProduct(scrapedItem.name);
+          if (matched) {
+            if (!itemsMap[matched.sn]) {
+              itemsMap[matched.sn] = { sales: 0, closing: 0 };
+              matchedCount++;
+            }
+            itemsMap[matched.sn].sales += Number(scrapedItem.qty) || 0;
+          }
+        });
+
+        const parsedSummary: PartyParseSummary = {
+          partyName: 'Company Primary Dispatch (Live CBO)',
+          fileName: `CBO_${fromMonth}_to_${toMonth}`,
+          itemCount: matchedCount,
+          totalSales: resultData.total_qty,
+          totalClosing: 0,
+          items: itemsMap,
+        };
+
+        setPrimaryData(parsedSummary);
+        setBotStatus(`🎉 SUCCESS! Matched ${matchedCount} Products (${resultData.total_qty} Units)`);
+        setTimeout(() => {
+          setShowCboModal(false);
+        }, 1200);
+      } else {
+        setBotError(resultData?.error || 'No items extracted.');
+        setBotStatus('Fetch failed.');
+      }
     } catch (err: any) {
-      console.error(err);
-      setBotError(err.message || 'Connection failed.');
-      setBotStatus('Failed to fetch data.');
+      setBotError(err.message || 'Network error');
+      setBotStatus('Bridge failed.');
     } finally {
       setBotLoading(false);
     }
-  };
-
-  // ✅ Confirm & Import into 73 Products
-  const handleApplyImport = () => {
-    if (!fetchedPrimaryResult || !fetchedPrimaryResult.items) return;
-
-    const itemsMap: Record<number, { sales: number; closing: number }> = {};
-    let matchedCount = 0;
-
-    fetchedPrimaryResult.items.forEach((scrapedItem: any) => {
-      const matched = matchMasterProduct(scrapedItem.name);
-      if (matched) {
-        if (!itemsMap[matched.sn]) {
-          itemsMap[matched.sn] = { sales: 0, closing: 0 };
-          matchedCount++;
-        }
-        itemsMap[matched.sn].sales += Number(scrapedItem.qty) || 0;
-      }
-    });
-
-    const parsedSummary: PartyParseSummary = {
-      partyName: 'Company Primary Dispatch (Google CBO)',
-      fileName: `CBO_${fromMonth}_to_${toMonth}`,
-      itemCount: matchedCount,
-      totalSales: fetchedPrimaryResult.total_qty,
-      totalClosing: 0,
-      items: itemsMap,
-    };
-
-    setPrimaryData(parsedSummary);
-    setShowCboModal(false);
-    setFetchedPrimaryResult(null);
   };
 
   const handleRemoveParty = (partyId: string) => {
@@ -276,7 +267,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         
         <div className="flex items-center gap-3">
           <span className="text-[11px] bg-cyan-950 text-cyan-300 border border-cyan-500/40 px-3 py-1 rounded-full font-mono font-bold flex items-center gap-1.5 shadow-lg shadow-cyan-950/50">
-            <Sparkles size={13} className="text-cyan-400 animate-pulse" /> DIOS V34.0 (GOOGLE CLOUD CBO ENGINE)
+            <Sparkles size={13} className="text-cyan-400 animate-pulse" /> DIOS V46.0 (CLOUDFLARE BRIDGE)
           </span>
           <span className="text-xs text-slate-400 font-medium">Month:</span>
           <select
@@ -342,8 +333,8 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
               </h3>
               <p className="text-xs text-slate-400">
                 {primaryData 
-                  ? `Live Source: ${primaryData.fileName} • Total: ${primaryData.totalSales.toLocaleString()} Units`
-                  : 'Google Cloud 24/7 automated sync from CBO ERP or manual file upload'}
+                  ? `Source: ${primaryData.fileName} • Total: ${primaryData.totalSales.toLocaleString()} Units`
+                  : 'Automated 1-Click Sync from CBO ERP or manual file upload'}
               </p>
             </div>
           </div>
@@ -603,13 +594,13 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
                 <div>
                   <h3 className="text-base font-bold text-white flex items-center gap-2">
                     CBO ERP Live Auto-Sync
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-mono">Google Cloud 24/7</span>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-mono">1-Click Bridge</span>
                   </h3>
-                  <p className="text-xs text-slate-400">Direct Google Apps Script Engine • No Server Sleeping</p>
+                  <p className="text-xs text-slate-400">Direct Server Bridge • Instant Population</p>
                 </div>
               </div>
               <button 
-                onClick={() => { setShowCboModal(false); setFetchedPrimaryResult(null); setBotError(null); setBotLogs([]); }}
+                onClick={() => { setShowCboModal(false); setBotError(null); setBotLogs([]); }}
                 className="text-slate-400 hover:text-white cursor-pointer p-1"
               >
                 <X size={20} />
@@ -653,46 +644,36 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
 
             {/* Status Feedback */}
             {botStatus && !botError && (
-              <div className={`p-3 rounded-xl text-xs mb-4 flex items-center gap-2 ${
-                fetchedPrimaryResult ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-300' : 'bg-slate-950 border border-slate-800 text-cyan-300'
-              }`}>
+              <div className="p-3.5 rounded-xl text-xs mb-4 bg-slate-950 border border-slate-800 text-cyan-300 flex items-center gap-2">
                 {botLoading ? <Loader2 size={16} className="animate-spin text-cyan-400" /> : <Check size={16} className="text-emerald-400" />}
                 <span>{botStatus}</span>
               </div>
             )}
 
-            {/* Error Feedback + Logs */}
+            {/* Live Logs Box */}
+            {botLogs.length > 0 && (
+              <div className="p-3.5 rounded-xl text-xs mb-4 bg-slate-950 border border-slate-800 text-slate-300 space-y-2">
+                <div className="flex items-center gap-2 font-mono text-cyan-400">
+                  <Terminal size={14} />
+                  <span>Server Bridge Log:</span>
+                </div>
+                <div className="p-2 bg-slate-900 rounded-lg text-[11px] font-mono text-slate-400 space-y-1 max-h-36 overflow-y-auto">
+                  {botLogs.map((log, idx) => (
+                    <div key={idx} className="break-all">• {log}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Error Feedback */}
             {botError && (
               <div className="p-3.5 rounded-xl text-xs mb-4 bg-rose-950/60 border border-rose-500/40 text-rose-300 space-y-2">
                 <div className="flex items-start gap-2">
                   <AlertTriangle size={18} className="text-rose-400 shrink-0 mt-0.5" />
                   <div>
-                    <div className="font-bold">Bot Diagnostic Status:</div>
+                    <div className="font-bold">Sync Error:</div>
                     <div className="text-[11px] text-rose-200 mt-0.5">{botError}</div>
                   </div>
-                </div>
-                {botLogs.length > 0 && (
-                  <div className="mt-2 p-2 bg-slate-950/80 rounded-lg text-[10px] font-mono text-slate-400 space-y-0.5 max-h-32 overflow-y-auto">
-                    {botLogs.map((l, i) => <div key={i}>• {l}</div>)}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Fetched Data Summary Box */}
-            {fetchedPrimaryResult && fetchedPrimaryResult.count > 0 && (
-              <div className="mb-5 p-4 bg-slate-950 rounded-2xl border border-emerald-500/40 space-y-2 text-xs">
-                <div className="font-bold text-emerald-400 flex items-center justify-between border-b border-slate-800 pb-2">
-                  <span>🎉 Live Extracted from CBO ERP!</span>
-                  <span>{fetchedPrimaryResult.count} Products</span>
-                </div>
-                <div className="flex justify-between text-slate-300 pt-1">
-                  <span>Total Primary Qty:</span>
-                  <span className="font-mono font-bold text-cyan-400 text-sm">{fetchedPrimaryResult.total_qty.toLocaleString()} Units</span>
-                </div>
-                <div className="flex justify-between text-slate-300">
-                  <span>Total Primary Value:</span>
-                  <span className="font-mono font-bold text-emerald-400 text-sm">₹ {Math.round(fetchedPrimaryResult.total_value).toLocaleString()}</span>
                 </div>
               </div>
             )}
@@ -701,32 +682,22 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => { setShowCboModal(false); setFetchedPrimaryResult(null); setBotError(null); setBotLogs([]); }}
+                onClick={() => { setShowCboModal(false); setBotError(null); setBotLogs([]); }}
                 disabled={botLoading}
                 className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
               >
                 Cancel
               </button>
 
-              {(!fetchedPrimaryResult || fetchedPrimaryResult.count === 0) ? (
-                <button
-                  type="button"
-                  onClick={handleTriggerBot}
-                  disabled={botLoading}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-cyan-500/20 transition cursor-pointer"
-                >
-                  {botLoading ? <Loader2 size={16} className="animate-spin" /> : <Bot size={16} />}
-                  {botLoading ? 'Running Google Cloud Bot...' : 'Fetch from CBO ERP'}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleApplyImport}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-extrabold rounded-xl shadow-lg shadow-emerald-500/20 transition cursor-pointer"
-                >
-                  <CheckCircle2 size={16} /> Import into Workspace
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleTriggerBot}
+                disabled={botLoading}
+                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-cyan-500/20 transition cursor-pointer"
+              >
+                {botLoading ? <Loader2 size={16} className="animate-spin" /> : <Bot size={16} />}
+                {botLoading ? 'Fetching from CBO...' : 'Fetch & Auto-Fill Table'}
+              </button>
             </div>
           </div>
         </div>

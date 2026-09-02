@@ -1,0 +1,312 @@
+function doGet(e) {
+  return ContentService.createTextOutput(JSON.stringify({ 
+    status: "online", 
+    message: "DIOS Google Cloud Engine v39.0 (URLEncoded PostBack) is Live!" 
+  })).setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  var logs = [];
+  try {
+    var data = {};
+    if (e && e.postData && e.postData.contents) {
+      data = JSON.parse(e.postData.contents);
+    }
+    
+    var fromMonth = (data.from_month || "Aug-2026").trim();
+    var toMonth = (data.to_month || "Aug-2026").trim();
+    var fyYear = data.fy_year || "2026-2027";
+
+    var CBO_USER = "6958BANWARI";
+    var CBO_PASS = "6958";
+
+    logs.push("1. Target: " + fromMonth + " to " + toMonth);
+
+    // Cookie Jar
+    function updateCookies(resp, existingCookies) {
+      var allHeaders = resp.getAllHeaders();
+      var jar = {};
+      if (existingCookies) {
+        existingCookies.split(';').forEach(function(c) {
+          var p = c.trim().split('=');
+          if (p[0]) jar[p[0]] = p.slice(1).join('=');
+        });
+      }
+      for (var k in allHeaders) {
+        if (k.toLowerCase() === 'set-cookie') {
+          var raw = allHeaders[k];
+          var list = Array.isArray(raw) ? raw : [raw];
+          list.forEach(function(cookieStr) {
+            var first = cookieStr.split(';')[0];
+            var parts = first.split('=');
+            if (parts[0]) jar[parts[0].trim()] = parts.slice(1).join('=').trim();
+          });
+        }
+      }
+      var out = [];
+      for (var key in jar) {
+        out.push(key + '=' + jar[key]);
+      }
+      return out.join('; ');
+    }
+
+    function resolveUrl(base, relative) {
+      if (!relative) return base;
+      if (relative.indexOf('http') === 0) return relative;
+      if (relative.indexOf('/') === 0) {
+        var domain = base.match(/^https?:\/\/[^\/]+/)[0];
+        return domain + relative;
+      }
+      var basePath = base.substring(0, base.lastIndexOf('/') + 1);
+      return basePath + relative;
+    }
+
+    // Bulletproof Option Value Finder (handles unclosed <option> tags)
+    function findMonthValue(optionsBlock, targetMonth) {
+      var targetM = targetMonth.substring(0, 3).toLowerCase();
+      var targetY = (targetMonth.match(/\d{4}/) || ['2026'])[0];
+      var shortY = targetY.slice(-2);
+
+      var optRegex = /<option\s+[^>]*?value=["']?([^"'\s>]+)["']?[^>]*>([^<]*)/gi;
+      var match;
+      var bestVal = null;
+      var firstVal = "";
+
+      while ((match = optRegex.exec(optionsBlock)) !== null) {
+        var val = match[1];
+        var text = match[2].trim();
+        if (val && !firstVal) firstVal = val;
+
+        var fullStr = (val + " " + text).toLowerCase();
+        if (fullStr.indexOf(targetM) !== -1 && (fullStr.indexOf(targetY) !== -1 || fullStr.indexOf(shortY) !== -1)) {
+          bestVal = val;
+          break;
+        }
+        if (fullStr.indexOf(targetM) !== -1 && !bestVal) {
+          bestVal = val;
+        }
+      }
+      return bestVal || firstVal || targetMonth;
+    }
+
+    // STEP A: Initial Login GET
+    var loginUrl = "https://dios.myreporting.net/Login.aspx";
+    var r1 = UrlFetchApp.fetch(loginUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+      muteHttpExceptions: true
+    });
+    var cookieStr = updateCookies(r1, "");
+    var htmlLogin = r1.getContentText();
+
+    var vs = htmlLogin.match(/name="__VIEWSTATE"[^>]*value="([^"]*)"/i);
+    var vsg = htmlLogin.match(/name="__VIEWSTATEGENERATOR"[^>]*value="([^"]*)"/i);
+    var ev = htmlLogin.match(/name="__EVENTVALIDATION"[^>]*value="([^"]*)"/i);
+
+    // STEP B: POST Login
+    var loginParams = {
+      "__VIEWSTATE": vs ? vs[1] : "",
+      "__VIEWSTATEGENERATOR": vsg ? vsg[1] : "",
+      "__EVENTVALIDATION": ev ? ev[1] : "",
+      "txtUserName": CBO_USER,
+      "txtPassword": CBO_PASS,
+      "btnLogin": "Login",
+      "username": CBO_USER,
+      "password": CBO_PASS
+    };
+
+    var loginBody = Object.keys(loginParams).map(function(k) {
+      return encodeURIComponent(k) + '=' + encodeURIComponent(loginParams[k]);
+    }).join('&');
+
+    var r2 = UrlFetchApp.fetch(loginUrl, {
+      method: "post",
+      payload: loginBody,
+      headers: { 
+        "Cookie": cookieStr, 
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "Mozilla/5.0" 
+      },
+      followRedirects: false,
+      muteHttpExceptions: true
+    });
+    cookieStr = updateCookies(r2, cookieStr);
+    logs.push("2. Authenticated. Status: " + r2.getResponseCode());
+
+    // STEP C: Open Report Page
+    var reportUrl = "https://dios.myreporting.net/RPT/PerformanceReview.aspx?format=Primary%20Sales&wise=P&DOC_TYPE=SS&RPT_HEADER=Monthly%20Sales-Summary&CBOYN=Y&FY_YEAR=" + fyYear + "&COMPANY_CODE=DIOS&PA_ID=6958&DESIG_ID=1&DESIG=BE&PA_NAME=BANWARI%20LAL%20MEENA&HEAD_QTR=UDAIPUR&DIVISION_NAME=DIOS%20GROUP&FMCGYN=N&MENU_STYLE=NONE&ACTION_FROM=ANDROID&LOGIN_PA_ID=6958&LOGIN_COMPANY_ID=1";
+
+    var r3 = UrlFetchApp.fetch(reportUrl, {
+      headers: { "Cookie": cookieStr, "User-Agent": "Mozilla/5.0" },
+      muteHttpExceptions: true
+    });
+    cookieStr = updateCookies(r3, cookieStr);
+    var parentHtml = r3.getContentText();
+
+    // STEP D: Load Iframe HTML
+    var targetUrl = reportUrl;
+    var targetHtml = parentHtml;
+
+    var iframeMatches = parentHtml.match(/<iframe\s+[^>]*?src=["']([^"']+)["'][^>]*?>/gi) || [];
+    for (var i = 0; i < iframeMatches.length; i++) {
+      var srcMatch = iframeMatches[i].match(/src=["']([^"']+)["']/i);
+      if (srcMatch && srcMatch[1]) {
+        var rawSrc = srcMatch[1].replace(/&amp;/g, '&');
+        var iframeFullUrl = resolveUrl(reportUrl, rawSrc);
+        var rIframe = UrlFetchApp.fetch(iframeFullUrl, {
+          headers: { "Cookie": cookieStr, "Referer": reportUrl, "User-Agent": "Mozilla/5.0" },
+          muteHttpExceptions: true
+        });
+        cookieStr = updateCookies(rIframe, cookieStr);
+        targetHtml = rIframe.getContentText();
+        targetUrl = iframeFullUrl;
+        logs.push("3. Iframe loaded (" + targetHtml.length + " bytes)");
+        break;
+      }
+    }
+
+    // STEP E: Extract ALL inputs & selects
+    var formPayload = {};
+
+    // 1. Inputs
+    var inputRegex = /<input\s+([^>]*?)>/gi;
+    var inpMatch;
+    while ((inpMatch = inputRegex.exec(targetHtml)) !== null) {
+      var attrs = inpMatch[1];
+      var nameM = attrs.match(/name=["']([^"']*)["']/i);
+      var idM = attrs.match(/id=["']([^"']*)["']/i);
+      var valM = attrs.match(/value=["']([^"']*)["']/i);
+      var key = (nameM ? nameM[1] : (idM ? idM[1] : ''));
+      var val = valM ? valM[1] : '';
+      if (key) formPayload[key] = val;
+    }
+
+    // 2. Selects
+    var selectRegex = /<select\s+([^>]*?)>([\s\S]*?)<\/select>/gi;
+    var selMatch;
+    var selectCount = 0;
+
+    while ((selMatch = selectRegex.exec(targetHtml)) !== null) {
+      selectCount++;
+      var selAttrs = selMatch[1];
+      var optionsBlock = selMatch[2];
+
+      var nameM2 = selAttrs.match(/name=["']([^"']*)["']/i);
+      var idM2 = selAttrs.match(/id=["']([^"']*)["']/i);
+      var selKey = (nameM2 ? nameM2[1] : (idM2 ? idM2[1] : 'select_' + selectCount));
+
+      var isFrom = selKey.toUpperCase() === 'MFDATE' || selKey.toUpperCase().indexOf('FDATE') !== -1;
+      var isTo = selKey.toUpperCase() === 'MTDATE' || selKey.toUpperCase().indexOf('TDATE') !== -1;
+
+      var chosenVal = "";
+      if (isFrom) {
+        chosenVal = findMonthValue(optionsBlock, fromMonth);
+        logs.push("From Date (" + selKey + ") -> " + chosenVal);
+      } else if (isTo) {
+        chosenVal = findMonthValue(optionsBlock, toMonth);
+        logs.push("To Date (" + selKey + ") -> " + chosenVal);
+      } else {
+        var optMatch = optionsBlock.match(/<option\s+[^>]*?value=["']?([^"'\s>]+)["']?[^>]*?selected/i);
+        if (optMatch) chosenVal = optMatch[1];
+        else {
+          var firstOpt = optionsBlock.match(/<option\s+[^>]*?value=["']?([^"'\s>]+)["']?/i);
+          if (firstOpt) chosenVal = firstOpt[1];
+        }
+      }
+
+      formPayload[selKey] = chosenVal;
+      if (idM2 && idM2[1]) formPayload[idM2[1]] = chosenVal;
+      if (nameM2 && nameM2[1]) formPayload[nameM2[1]] = chosenVal;
+    }
+
+    formPayload['btnGo'] = 'Go';
+    formPayload['Button1'] = 'Go';
+    formPayload['Go'] = 'Go';
+
+    // Copy parent viewstates
+    var pVs = parentHtml.match(/name="__VIEWSTATE"[^>]*value="([^"]*)"/i);
+    var pVsg = parentHtml.match(/name="__VIEWSTATEGENERATOR"[^>]*value="([^"]*)"/i);
+    var pEv = parentHtml.match(/name="__EVENTVALIDATION"[^>]*value="([^"]*)"/i);
+    if (pVs && !formPayload['__VIEWSTATE']) formPayload['__VIEWSTATE'] = pVs[1];
+    if (pVsg && !formPayload['__VIEWSTATEGENERATOR']) formPayload['__VIEWSTATEGENERATOR'] = pVsg[1];
+    if (pEv && !formPayload['__EVENTVALIDATION']) formPayload['__EVENTVALIDATION'] = pEv[1];
+
+    logs.push("4. Serialized " + selectCount + " dropdowns & " + Object.keys(formPayload).length + " fields.");
+
+    // STEP F: Prepare Form URL Encoded Body
+    var submitUrl = reportUrl;
+    var formActionMatch = targetHtml.match(/<form\s+[^>]*?action=["']([^"']+)["']/i);
+    if (formActionMatch && formActionMatch[1] && formActionMatch[1].trim() !== '#' && formActionMatch[1].indexOf('javascript') === -1) {
+      submitUrl = resolveUrl(targetUrl, formActionMatch[1]);
+    }
+
+    var postBodyString = Object.keys(formPayload).map(function(k) {
+      return encodeURIComponent(k) + '=' + encodeURIComponent(formPayload[k]);
+    }).join('&');
+
+    logs.push("5. Submitting URL-encoded payload (" + postBodyString.length + " bytes) to: " + submitUrl.split('?')[0]);
+
+    var r4 = UrlFetchApp.fetch(submitUrl, {
+      method: "post",
+      payload: postBodyString,
+      headers: { 
+        "Cookie": cookieStr, 
+        "Referer": targetUrl, 
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" 
+      },
+      muteHttpExceptions: true
+    });
+    var finalHtml = r4.getContentText();
+    logs.push("6. Response received (Status: " + r4.getResponseCode() + ", Length: " + finalHtml.length + ")");
+
+    // STEP G: Extract Product Rows
+    var items = [];
+    var rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+    var rowMatch;
+
+    while ((rowMatch = rowRegex.exec(finalHtml)) !== null) {
+      var rowContent = rowMatch[1];
+      var cellMatches = rowContent.match(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi);
+      if (cellMatches && cellMatches.length >= 2) {
+        var cells = cellMatches.map(function(c) {
+          return c.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
+        });
+        var pName = cells[0];
+
+        if (pName && !pName.match(/(PRODUCT|COUNT|PRIMARY SALES|TOTAL|MONTHLY SALES|CLOSE|ADVANCE|WISE|OPTIONS|COLUMNS|EXCEL|PDF|S\.N)/i) && pName.length > 2) {
+          var qty = parseFloat((cells[1] || '0').replace(/,/g, '')) || 0;
+          var val = parseFloat((cells[2] || '0').replace(/,/g, '')) || 0;
+          items.push({ name: pName, qty: qty, value: val });
+        }
+      }
+    }
+
+    var totalQty = 0;
+    var totalVal = 0;
+    for (var i = 0; i < items.length; i++) {
+      totalQty += items[i].qty;
+      totalVal += items[i].value;
+    }
+
+    logs.push("7. Extracted " + items.length + " products. Total Qty: " + totalQty);
+
+    return ContentService.createTextOutput(JSON.stringify({
+      success: true,
+      from_month: fromMonth,
+      to_month: toMonth,
+      count: items.length,
+      total_qty: totalQty,
+      total_value: totalVal,
+      items: items,
+      logs: logs
+    })).setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    logs.push("ERROR: " + err.toString());
+    return ContentService.createTextOutput(JSON.stringify({
+      success: false,
+      error: err.toString(),
+      logs: logs
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}

@@ -24,7 +24,7 @@ LOGIN_URL = "https://dios.myreporting.net/erp/login"
 
 @app.get("/")
 def root():
-    return {"status": "online", "engine": "Playwright CBO Engine", "version": "v42.0"}
+    return {"status": "online", "engine": "Playwright CBO Engine", "version": "v43.0"}
 
 @app.post("/api/fetch-primary")
 def fetch_primary(req: FetchRequest):
@@ -55,7 +55,7 @@ def fetch_primary(req: FetchRequest):
             # 3. Find Frame
             form_frame = page.main_frame
             for f in page.frames:
-                if f.locator("select#MFDATE").count() > 0:
+                if f.locator("select#MFDATE").count() > 0 or f.locator('select[name*="FDATE"]').count() > 0:
                     form_frame = f
                     break
 
