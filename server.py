@@ -257,6 +257,71 @@ def fetch_sales_performance(req: MonthRequest):
         "expiry": "21498"
     }
 
+# 4. CBO Primary Excel Download Endpoint
+@app.post("/api/fetch-cbo-excel")
+def fetch_cbo_excel(req: MonthRequest):
+    direct_report_url = f"https://dios.myreporting.net/RPT/PerformanceReview.aspx?format=Primary%20Sales&wise=P&DOC_TYPE=SS&RPT_HEADER=Monthly%20Sales-Summary&CBOYN=Y&FY_YEAR={req.fy_year}&COMPANY_CODE=DIOS&PA_ID=6958&DESIG_ID=1&DESIG=BE&PA_NAME=BANWARI%20LAL%20MEENA&HEAD_QTR=UDAIPUR&DIVISION_NAME=DIOS%20GROUP&FMCGYN=N&MENU_STYLE=NONE&ACTION_FROM=ANDROID&LOGIN_PA_ID=6958&LOGIN_COMPANY_ID=1"
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
+        context = browser.new_context(viewport={"width": 1440, "height": 900}, accept_downloads=True)
+        page = context.new_page()
+        page.on("dialog", lambda d: d.accept())
+
+        try:
+            login_cbo(page)
+            page.goto(direct_report_url, timeout=60000, wait_until="domcontentloaded")
+            page.wait_for_timeout(4000)
+
+            target_frame = page.main_frame
+            for f in page.frames:
+                if f.locator('select#MFDATE').count() > 0 or f.locator('select[name*="FDATE"]').count() > 0:
+                    target_frame = f
+                    break
+
+            target_frame.evaluate('''(target) => {
+                const selectMonth = (id, monthStr) => {
+                    const sel = document.getElementById(id);
+                    if (!sel) return;
+                    for (let o of sel.options) {
+                        if (o.text.toLowerCase().includes(monthStr.toLowerCase()) || o.text.toLowerCase().includes(monthStr.substring(0,3).toLowerCase())) {
+                            sel.value = o.value;
+                            sel.dispatchEvent(new Event('change', { bubbles: true }));
+                            break;
+                        }
+                    }
+                };
+                selectMonth('MFDATE', target);
+                selectMonth('MTDATE', target);
+            }''', req.from_month)
+
+            time.sleep(1)
+            target_frame.evaluate('() => { const b = document.getElementById("btnGo1") || document.getElementById("btnGo"); if (b) b.click(); }')
+            time.sleep(6)
+
+            excel_temp = f"/tmp/CBO_Primary_{req.from_month}.xls"
+            with page.expect_download(timeout=15000) as dl_info:
+                target_frame.evaluate('''() => {
+                    const elms = Array.from(document.querySelectorAll('a, button, input, img'));
+                    const btn = elms.find(e => (e.innerText || e.value || e.title || e.id || '').toLowerCase().includes('excel'));
+                    if (btn) btn.click();
+                }''')
+            dl = dl_info.value
+            dl.save_as(excel_temp)
+            browser.close()
+
+            with open(excel_temp, "rb") as f:
+                content = f.read()
+
+            return Response(
+                content=content,
+                media_type="application/vnd.ms-excel",
+                headers={"Content-Disposition": f"inline; filename=CBO_Primary_{req.from_month}.xls"}
+            )
+        except Exception as e:
+            browser.close()
+            raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))

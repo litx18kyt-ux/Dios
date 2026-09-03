@@ -1,5 +1,11 @@
-import React, { useState } from 'react';
-import { TrendingUp, Bot, Loader2, Save, Download, Check, AlertTriangle } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { 
+  TrendingUp, Bot, Loader2, Save, Download, Check, AlertTriangle, 
+  MessageSquare, Plus, Trash2, X, Info, UploadCloud, FileSpreadsheet
+} from 'lucide-react';
+import * as XLSX from 'xlsx-js-style';
+import { memoryStore, PartyBreakdownItem, DEFAULT_STOCKISTS } from '../../data/memoryStore';
+import '../../data/seedRemarks';
 
 const MONTHS = ['APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC', 'JAN', 'FEB', 'MAR'];
 
@@ -23,6 +29,7 @@ interface MetricConfig {
   id: string;
   name: string;
   isCalculated?: boolean;
+  hasBreakdown?: boolean;
 }
 
 const METRICS_CONFIG: MetricConfig[] = [
@@ -34,8 +41,8 @@ const METRICS_CONFIG: MetricConfig[] = [
   { sn: '4', id: 'sec_curr', name: 'SECONDARY 26-27 (Lacs)' },
   { sn: '5', id: 'sec_prev', name: 'SECONDARY 25-26 (Lacs)' },
   { sn: '6', id: 'sec_growth', name: 'SECONDARY GROWTH %', isCalculated: true },
-  { sn: '7', id: 'sales_returns', name: 'SALES RETURNS (₹)' },
-  { sn: '8', id: 'expiry', name: 'EXPIRY (₹)' },
+  { sn: '7', id: 'sales_returns', name: 'SALES RETURNS (₹)', hasBreakdown: true },
+  { sn: '8', id: 'expiry', name: 'EXPIRY (₹)', hasBreakdown: true },
   { sn: '9', id: 'closing_stock', name: 'CLOSING STOCK (Lacs)' },
   { sn: '10', id: 'investment', name: 'INVESTMENT' }
 ];
@@ -62,6 +69,66 @@ export const SalesPerformanceSheet: React.FC = () => {
   const [statusMsg, setStatusMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 📝 Modal State for Remarks / Party Breakdown
+  const [activeModal, setActiveModal] = useState<{
+    rowId: string;
+    rowName: string;
+    month: string;
+  } | null>(null);
+
+  const [modalItems, setModalItems] = useState<PartyBreakdownItem[]>([]);
+
+  const openBreakdownModal = (rowId: string, rowName: string, month: string) => {
+    const key = `${rowId}_${month}`;
+    const existing = memoryStore.salesBreakdown[key] || [];
+    setModalItems(JSON.parse(JSON.stringify(existing)));
+    setActiveModal({ rowId, rowName, month });
+  };
+
+  const handleAddModalItem = () => {
+    setModalItems(prev => [
+      ...prev,
+      {
+        id: 'item_' + Date.now(),
+        partyName: DEFAULT_STOCKISTS[0],
+        amount: 0,
+        note: ''
+      }
+    ]);
+  };
+
+  const handleModalItemChange = (idx: number, field: keyof PartyBreakdownItem, val: any) => {
+    setModalItems(prev => {
+      const copy = [...prev];
+      copy[idx] = { ...copy[idx], [field]: val };
+      return copy;
+    });
+  };
+
+  const handleRemoveModalItem = (idx: number) => {
+    setModalItems(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleSaveModal = () => {
+    if (!activeModal) return;
+    const key = `${activeModal.rowId}_${activeModal.month}`;
+    memoryStore.salesBreakdown[key] = modalItems;
+
+    // Auto calculate total and update ONLY this specific month cell value
+    const total = modalItems.reduce((sum, it) => sum + (parseFloat(String(it.amount)) || 0), 0);
+    setFormData(prev => ({
+      ...prev,
+      [activeModal.rowId]: {
+        ...prev[activeModal.rowId],
+        [activeModal.month]: total > 0 ? String(total) : '0'
+      }
+    }));
+
+    setActiveModal(null);
+  };
 
   const handleCellChange = (rowId: string, month: string, value: string) => {
     setFormData(prev => ({
@@ -141,7 +208,7 @@ export const SalesPerformanceSheet: React.FC = () => {
     return hasNumeric ? (sum > 1000 ? Math.round(sum).toLocaleString() : sum.toFixed(2)) : '-';
   };
 
-  // 🤖 Safe 1-Click CBO Auto-Fetch
+  // 🤖 1. AUTO-FETCH CBO SALES (Multi-Month safe)
   const handleFetchFromCbo = async () => {
     setLoading(true);
     setErrorMsg(null);
@@ -161,32 +228,191 @@ export const SalesPerformanceSheet: React.FC = () => {
         })
       });
 
-      const text = await res.text();
-      let data: any = null;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        throw new Error('Server returned invalid response: ' + text.substring(0, 100));
-      }
+      const data = await res.json();
 
       if (data && data.success) {
         setFormData(prev => ({
           ...prev,
-          primary_curr: { ...prev.primary_curr, [targetCode]: String(data.net_sales_lacs || '4.32') },
-          sales_returns: { ...prev.sales_returns, [targetCode]: String(data.sales_return || '5590') },
-          expiry: { ...prev.expiry, [targetCode]: String(data.expiry || '21498') },
+          primary_curr: { ...prev.primary_curr, [targetCode]: String(data.net_sales_lacs || '0') },
+          sales_returns: { ...prev.sales_returns, [targetCode]: String(data.sales_return || '0') },
+          expiry: { ...prev.expiry, [targetCode]: String(data.expiry || '0') },
         }));
 
-        setStatusMsg(`🎉 SUCCESS! ${selectedMonth} auto-filled: Primary ${data.net_sales_lacs}L, Returns ₹${data.sales_return}, Expiry ₹${data.expiry}!`);
+        if (data.sales_return_breakdown) {
+          memoryStore.salesBreakdown[`sales_returns_${targetCode}`] = data.sales_return_breakdown;
+        }
+        if (data.expiry_breakdown) {
+          memoryStore.salesBreakdown[`expiry_${targetCode}`] = data.expiry_breakdown;
+        }
+
+        setStatusMsg(`🎉 SUCCESS! ${selectedMonth} auto-filled: Net Primary ${data.net_sales_lacs}L, Returns ₹${data.sales_return}, Expiry ₹${data.expiry}!`);
       } else {
         throw new Error(data?.error || 'Failed to fetch sales performance data');
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'CBO fetch failed.');
+      setErrorMsg(err.message || 'CBO fetch error');
       setStatusMsg('');
     } finally {
       setLoading(false);
     }
+  };
+
+  // 📂 2. DIRECT UPLOAD & PARSE SPO EXCEL (Instant In-Browser Processing)
+  const handleUploadSpoExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    setStatusMsg(`Reading & Parsing ${file.name}...`);
+    setErrorMsg(null);
+
+    const opt = MONTH_OPTIONS.find(m => m.value === selectedMonth);
+    const targetCode = opt ? opt.code : 'AUG';
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+      let totalNetSales = 0;
+      let totalGoodsReturn = 0;
+      let totalBreakageExpiry = 0;
+
+      const returnBreakdown: PartyBreakdownItem[] = [];
+      const expiryBreakdown: PartyBreakdownItem[] = [];
+
+      for (let r = 0; r < rows.length; r++) {
+        const row = rows[r];
+        if (!row || row.length < 5) continue;
+
+        const stockistName = String(row[1] || '').trim();
+        if (!stockistName) continue;
+
+        const uName = stockistName.toUpperCase();
+        if (uName.includes('STOCKIST') || uName.includes('REPORT') || uName.includes('SRNO') || uName.includes('DIOS') || uName === 'TOTAL') continue;
+
+        const parseNum = (val: any) => {
+          if (!val) return 0;
+          const clean = String(val).replace(/,/g, '').replace(/₹/g, '').trim();
+          const n = parseFloat(clean);
+          return isNaN(n) ? 0 : n;
+        };
+
+        const goodsReturn = parseNum(row[5]) || parseNum(row[7]);
+        const breakageExpiry = parseNum(row[11]) || parseNum(row[9]);
+        const netSales = parseNum(row[14]);
+
+        if (goodsReturn > 0) {
+          totalGoodsReturn += goodsReturn;
+          returnBreakdown.push({
+            id: 'ret_' + r,
+            partyName: stockistName,
+            amount: goodsReturn,
+            note: 'Goods Return'
+          });
+        }
+
+        if (breakageExpiry > 0) {
+          totalBreakageExpiry += breakageExpiry;
+          expiryBreakdown.push({
+            id: 'exp_' + r,
+            partyName: stockistName,
+            amount: breakageExpiry,
+            note: 'Expiry Return'
+          });
+        }
+
+        if (netSales !== 0) {
+          totalNetSales += netSales;
+        }
+      }
+
+      const netSalesLacs = (totalNetSales / 100000).toFixed(2);
+
+      // Update targeted month cleanly in React state
+      setFormData(prev => ({
+        ...prev,
+        primary_curr: { ...prev.primary_curr, [targetCode]: netSalesLacs },
+        sales_returns: { ...prev.sales_returns, [targetCode]: String(Math.round(totalGoodsReturn)) },
+        expiry: { ...prev.expiry, [targetCode]: String(Math.round(totalBreakageExpiry)) }
+      }));
+
+      // Store remarks breakdown in memoryStore
+      memoryStore.salesBreakdown[`sales_returns_${targetCode}`] = returnBreakdown;
+      memoryStore.salesBreakdown[`expiry_${targetCode}`] = expiryBreakdown;
+
+      setStatusMsg(`🎉 SUCCESS! '${file.name}' parsed: Net Primary ${netSalesLacs}L, Returns ₹${totalGoodsReturn.toLocaleString()}, Expiry ₹${totalBreakageExpiry.toLocaleString()}!`);
+    } catch (err: any) {
+      setErrorMsg(`Excel reading error: ${err.message || String(err)}`);
+      setStatusMsg('');
+    } finally {
+      setLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // 📊 3. EXPORT EXCEL WITH NATIVE HOVER COMMENTS
+  const handleExportExcelWithComments = () => {
+    const wb = XLSX.utils.book_new();
+    const headers = ['S.N.', 'PARTICULARS', ...MONTHS, 'CUMM'];
+    const wsData: any[][] = [];
+
+    wsData.push([{ v: 'DIOS LIFESCIENCES PVT LTD', s: { font: { sz: 14, bold: true } } }]);
+    wsData.push([{ v: '3. SALES PERFORMANCE (WITH STOCKIST-WISE REMARKS COMMENTS)', s: { font: { sz: 12, bold: true, color: { rgb: '0284C7' } } } }]);
+    wsData.push(headers.map(h => ({
+      v: h,
+      s: {
+        font: { bold: true, color: { rgb: 'FFFFFF' } },
+        fill: { fgColor: { rgb: '0F172A' } },
+        alignment: { horizontal: 'center' }
+      }
+    })));
+
+    METRICS_CONFIG.forEach(row => {
+      const rCells: any[] = [
+        { v: row.sn, s: { alignment: { horizontal: 'center' } } },
+        { v: row.name, s: { font: { bold: true } } }
+      ];
+
+      MONTHS.forEach(m => {
+        const val = row.isCalculated ? calculateCell(row.id, m) : (formData[row.id]?.[m] || '');
+        const cellObj: any = {
+          v: val,
+          s: { alignment: { horizontal: 'center' } }
+        };
+
+        if (row.hasBreakdown) {
+          const key = `${row.id}_${m}`;
+          const items = memoryStore.salesBreakdown[key];
+          if (items && items.length > 0) {
+            const commentLines = items.map(it => `• ${it.partyName}: ₹${Number(it.amount).toLocaleString()} ${it.note ? '(' + it.note + ')' : ''}`);
+            cellObj.c = [
+              {
+                a: 'DIOS Review System',
+                t: `Party-wise Breakdown (${row.name} - ${m}):\n${commentLines.join('\n')}\nTotal: ₹${Number(val).toLocaleString()}`
+              }
+            ];
+            cellObj.s.fill = { fgColor: { rgb: 'FEF3C7' } }; // Yellow tint
+          }
+        }
+
+        rCells.push(cellObj);
+      });
+
+      rCells.push({
+        v: calculateCumm(row.id),
+        s: { font: { bold: true, color: { rgb: '059669' } }, alignment: { horizontal: 'center' } }
+      });
+
+      wsData.push(rCells);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = [{ wch: 6 }, { wch: 32 }, ...MONTHS.map(() => ({ wch: 11 })), { wch: 14 }];
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Sales Performance');
+    XLSX.writeFile(wb, `Sales_Performance_Review_${selectedMonth}.xlsx`);
   };
 
   const handleSave = () => {
@@ -196,7 +422,7 @@ export const SalesPerformanceSheet: React.FC = () => {
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-5">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-4 border-b border-slate-800">
         <div className="flex items-center gap-3">
           <span className="p-2.5 bg-purple-500/20 text-purple-400 rounded-xl border border-purple-500/30">
             <TrendingUp size={22} />
@@ -204,17 +430,17 @@ export const SalesPerformanceSheet: React.FC = () => {
           <div>
             <h2 className="text-base font-bold text-white flex items-center gap-2">
               3. SALES PERFORMANCE
-              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-mono">
-                Formula Engine
+              <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full font-mono flex items-center gap-1">
+                <MessageSquare size={10} /> Dual Mode (Fetch + Upload)
               </span>
             </h2>
-            <p className="text-xs text-slate-400">BE: BANWARI LAL MEENA • HQ: UDAIPUR • 2026-2027</p>
+            <p className="text-xs text-slate-400">BE: BANWARI LAL MEENA • HQ: UDAIPUR • Net Primary Engine</p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
-            <span className="text-xs text-slate-400 font-medium">Month:</span>
+            <span className="text-xs text-slate-400 font-medium">Target:</span>
             <select
               value={selectedMonth}
               onChange={e => setSelectedMonth(e.target.value)}
@@ -229,13 +455,36 @@ export const SalesPerformanceSheet: React.FC = () => {
             </select>
           </div>
 
+          {/* 📂 Option 1: Direct File Upload */}
+          <label className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 transition cursor-pointer">
+            <UploadCloud size={14} />
+            Upload SPO Excel
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={handleUploadSpoExcel}
+              className="hidden"
+            />
+          </label>
+
+          {/* ⚡ Option 2: Live Auto-Fetch */}
           <button
             onClick={handleFetchFromCbo}
             disabled={loading}
-            className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-purple-600/20 transition cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-purple-600/20 transition cursor-pointer"
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : <Bot size={14} />}
-            {loading ? 'Fetching CBO...' : '⚡ Auto-Fetch CBO Sales'}
+            Auto-Fetch {selectedMonth}
+          </button>
+
+          {/* 📊 Option 3: Export with Comments */}
+          <button
+            onClick={handleExportExcelWithComments}
+            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 transition cursor-pointer"
+            title="Download Excel with native hover comments"
+          >
+            <Download size={14} /> Export Excel
           </button>
 
           <button
@@ -262,6 +511,13 @@ export const SalesPerformanceSheet: React.FC = () => {
         </div>
       )}
 
+      <div className="flex items-center gap-2 px-3 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-slate-400">
+        <Info size={14} className="text-amber-400 shrink-0" />
+        <span>
+          Aap chahe <b>"Auto-Fetch"</b> karein ya CBO se download ki hui <b>"Upload SPO Excel"</b> karein — dono se <b>Net Primary (4.32L)</b>, <b>Returns (₹5,590)</b> aur <b>Expiry (₹21,498)</b> stockist-wise load ho jayenge!
+        </span>
+      </div>
+
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
@@ -269,7 +525,9 @@ export const SalesPerformanceSheet: React.FC = () => {
               <th className="p-3 w-10 text-center">S.N.</th>
               <th className="p-3 min-w-[240px]">Particulars</th>
               {MONTHS.map(m => (
-                <th key={m} className="p-3 text-center min-w-[75px]">{m}</th>
+                <th key={m} className={`p-3 text-center min-w-[75px] ${m === selectedMonth.substring(0,3).toUpperCase() ? 'text-cyan-400 bg-cyan-950/30 font-extrabold' : ''}`}>
+                  {m}
+                </th>
               ))}
               <th className="p-3 text-center min-w-[85px] bg-purple-950/50 text-purple-300 font-bold">CUMM</th>
             </tr>
@@ -278,16 +536,52 @@ export const SalesPerformanceSheet: React.FC = () => {
             {METRICS_CONFIG.map((row) => (
               <tr key={row.id} className="hover:bg-slate-800/30 transition">
                 <td className="p-2 text-center text-slate-500 font-mono">{row.sn}</td>
-                <td className="p-2 font-medium text-slate-200">{row.name}</td>
+                <td className="p-2 font-medium text-slate-200 flex items-center justify-between">
+                  <span>{row.name}</span>
+                  {row.hasBreakdown && (
+                    <span className="text-[10px] text-amber-400/80 bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-500/20 font-mono">
+                      Breakdown
+                    </span>
+                  )}
+                </td>
                 
                 {MONTHS.map((m) => {
                   const val = row.isCalculated ? calculateCell(row.id, m) : (formData[row.id]?.[m] ?? '');
+                  const breakdownKey = `${row.id}_${m}`;
+                  const items = memoryStore.salesBreakdown[breakdownKey] || [];
+                  const hasItems = items.length > 0;
+                  const isSelectedCol = m === selectedMonth.substring(0,3).toUpperCase();
 
                   return (
-                    <td key={m} className="p-1 text-center">
+                    <td key={m} className={`p-1 text-center ${isSelectedCol ? 'bg-cyan-950/10' : ''}`}>
                       {row.isCalculated ? (
                         <div className="w-full py-1.5 px-2 bg-slate-950/80 rounded-lg font-mono font-bold text-cyan-400 border border-slate-800/60 text-center">
                           {val}
+                        </div>
+                      ) : row.hasBreakdown ? (
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={val}
+                            onClick={() => openBreakdownModal(row.id, row.name, m)}
+                            onChange={(e) => handleCellChange(row.id, m, e.target.value)}
+                            placeholder="-"
+                            className={`w-full py-1.5 px-2 bg-slate-950 rounded-lg font-mono border focus:outline-none text-center transition text-xs cursor-pointer ${
+                              hasItems 
+                                ? 'text-amber-300 font-bold border-amber-500/50 hover:bg-amber-950/30 shadow-sm shadow-amber-950/40' 
+                                : 'text-slate-100 border-slate-800 hover:border-slate-600'
+                            }`}
+                            title="Click to view/edit stockist remarks breakdown"
+                          />
+                          {hasItems && (
+                            <span 
+                              onClick={() => openBreakdownModal(row.id, row.name, m)}
+                              className="absolute -top-1.5 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-slate-950 shadow cursor-pointer"
+                              title={`${items.length} stockists breakdown`}
+                            >
+                              {items.length}
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <input
@@ -310,6 +604,117 @@ export const SalesPerformanceSheet: React.FC = () => {
           </tbody>
         </table>
       </div>
+
+      {/* 📝 STOCKIST REMARKS & BREAKDOWN MODAL */}
+      {activeModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 bg-amber-500/20 text-amber-400 rounded-xl border border-amber-500/30">
+                  <MessageSquare size={20} />
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    Stockist Remarks &amp; Breakdown
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono">
+                    {activeModal.rowName} • <span className="text-amber-400 font-bold">{activeModal.month} 2026</span>
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setActiveModal(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+              {modalItems.length === 0 ? (
+                <div className="py-8 text-center text-slate-500 text-xs border border-dashed border-slate-800 rounded-2xl">
+                  Koi stockist breakdown add nahi hai. Click "+ Add Stockist" to add manual remarks.
+                </div>
+              ) : (
+                modalItems.map((item, idx) => (
+                  <div key={item.id || idx} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-3 bg-slate-950 rounded-2xl border border-slate-800">
+                    <div className="flex-1">
+                      <label className="text-[10px] text-slate-400 font-semibold block mb-1">Distributor / Stockist</label>
+                      <select
+                        value={item.partyName}
+                        onChange={(e) => handleModalItemChange(idx, 'partyName', e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-amber-400"
+                      >
+                        {DEFAULT_STOCKISTS.map(st => (
+                          <option key={st} value={st}>{st}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="w-full sm:w-32">
+                      <label className="text-[10px] text-slate-400 font-semibold block mb-1">Amount (₹)</label>
+                      <input
+                        type="number"
+                        value={item.amount || ''}
+                        onChange={(e) => handleModalItemChange(idx, 'amount', parseFloat(e.target.value) || 0)}
+                        placeholder="0"
+                        className="w-full bg-slate-900 border border-slate-700 text-amber-300 font-mono font-bold text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-amber-400 text-right"
+                      />
+                    </div>
+
+                    <div className="flex-1">
+                      <label className="text-[10px] text-slate-400 font-semibold block mb-1">Reason / Remarks Note</label>
+                      <input
+                        type="text"
+                        value={item.note || ''}
+                        onChange={(e) => handleModalItemChange(idx, 'note', e.target.value)}
+                        placeholder="e.g. Goods Return or Expiry batch"
+                        className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-amber-400"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveModalItem(idx)}
+                      className="p-2 text-slate-500 hover:text-rose-400 self-end sm:self-center mt-2 sm:mt-4 cursor-pointer"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={handleAddModalItem}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 text-xs font-semibold rounded-xl transition cursor-pointer"
+              >
+                <Plus size={14} /> Add Stockist
+              </button>
+
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Breakdown</div>
+                  <div className="text-sm font-bold text-amber-400 font-mono">
+                    ₹ {modalItems.reduce((s, it) => s + (parseFloat(String(it.amount)) || 0), 0).toLocaleString()}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSaveModal}
+                  className="px-5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-amber-500/20 transition cursor-pointer"
+                >
+                  Save Remarks &amp; Update Cell
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -102,8 +102,8 @@ export function matchMasterProduct(rawName: string): MasterProduct | null {
     if (c.includes('GOLD')) return PROD_BY_SN[46];
     if (c.includes('ASP') && (c.includes('150') || c.includes('ASP 150'))) return PROD_BY_SN[41];
     if (c.includes('ASP')) return PROD_BY_SN[40];
-    if (c.includes('F') && (c.includes('20') || c.includes('F 20') || c.includes('F20'))) return PROD_BY_SN[48];
-    if (c.includes('F')) return PROD_BY_SN[45];
+    if (hasWord(c, 'F') && (hasWord(c, '20') || c.includes('F 20') || c.includes('F20'))) return PROD_BY_SN[48];
+    if (hasWord(c, 'F')) return PROD_BY_SN[45];
     if (hasWord(c, '40')) return PROD_BY_SN[39];
     if (hasWord(c, '20')) return PROD_BY_SN[38];
     if (hasWord(c, '10')) return PROD_BY_SN[37];
@@ -163,7 +163,7 @@ export function matchMasterProduct(rawName: string): MasterProduct | null {
     return PROD_BY_SN[5];
   }
 
-  // 14. OTHERS
+  // 14. OTHERS (Strict word boundaries to avoid collision)
   if (c.includes('CILDIOS')) {
     if (c.includes('20')) return PROD_BY_SN[4];
     return PROD_BY_SN[3];
@@ -181,8 +181,8 @@ export function matchMasterProduct(rawName: string): MasterProduct | null {
     return PROD_BY_SN[30];
   }
   if (c.includes('PROSTADO')) {
-    if (c.includes('D')) return PROD_BY_SN[33];
-    return PROD_BY_SN[34];
+    if (hasWord(c, 'D')) return PROD_BY_SN[33]; // PROSTADO D TAB
+    return PROD_BY_SN[34]; // PROSTADO TAB
   }
   if (c.includes('DIOFLAM')) return PROD_BY_SN[7];
   if (c.includes('DIOMILIN')) return PROD_BY_SN[8];

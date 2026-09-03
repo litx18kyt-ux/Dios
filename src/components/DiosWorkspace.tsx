@@ -2,12 +2,15 @@ import React, { useState, useMemo } from 'react';
 import { 
   ArrowLeft, Upload, FileSpreadsheet, Download, CheckCircle2, 
   Trash2, Eye, X, RefreshCw, Layers, Building2, Search, Calculator,
-  Package, Bot, Sparkles, Check, Loader2, Calendar, AlertTriangle, FileSpreadsheet as ExcelIcon
+  Package, Bot, Sparkles, Check, Loader2, Calendar, AlertTriangle, 
+  FileSpreadsheet as ExcelIcon, Edit3
 } from 'lucide-react';
 import { MASTER_PRODUCTS } from '../data/masterProducts';
 import { parsePartyFile, parsePrimaryFile, PartyParseSummary, matchMasterProduct } from '../parsers';
 import { exportToExcel } from '../utils/excelExporter';
 import { AggregatedProduct } from '../parsers/common';
+import { DhruviManualModal } from './DhruviManualModal';
+import { memoryStore } from '../data/memoryStore';
 
 const MONTHS = [
   'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 
@@ -39,6 +42,7 @@ interface PartySlot {
   name: string;
   location: string;
   software: string;
+  isManual?: boolean;
 }
 
 const PARTIES_CONFIG: PartySlot[] = [
@@ -48,18 +52,15 @@ const PARTIES_CONFIG: PartySlot[] = [
   { id: 'modi', name: 'Modi Distributors', location: 'Udaipur', software: 'Marg / Prompt (PDF/XLS)' },
   { id: 'dwarika', name: 'Dwarika Medicals', location: 'Udaipur', software: 'Marg ERP Nano (XLS/CSV)' },
   { id: 'nagda', name: 'Nagda Distributors', location: 'Udaipur', software: 'Marg ERP Nano (All Formats)' },
+  { id: 'dhruvi', name: 'Dhruvi', location: 'Manual Entry', software: 'In-Cell Math (+6+6, +6-2)', isManual: true },
 ];
-
-interface Props {
-  onBack: () => void;
-}
 
 export interface FullAggregatedProduct extends AggregatedProduct {
   netPri: number;
   priValue: number;
 }
 
-export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
+export const DiosWorkspace: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [selectedMonth, setSelectedMonth] = useState<string>('AUGUST');
   const [tableSearch, setTableSearch] = useState('');
   const [loadingPartyId, setLoadingPartyId] = useState<string | null>(null);
@@ -67,6 +68,9 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
   const [partyDataMap, setPartyDataMap] = useState<Record<string, PartyParseSummary>>({});
   const [primaryData, setPrimaryData] = useState<PartyParseSummary | null>(null);
   const [selectedProductForModal, setSelectedProductForModal] = useState<FullAggregatedProduct | null>(null);
+
+  // 📝 Dhruvi Modal State
+  const [showDhruviModal, setShowDhruviModal] = useState(false);
 
   // CBO Modal State
   const [showCboModal, setShowCboModal] = useState(false);
@@ -168,7 +172,33 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
     }
   };
 
-  // Method 1: Live JSON Web Scraper Auto-Fill
+  // 🧮 Dhruvi Callbacks
+  const handleDhruviSave = (summary: PartyParseSummary) => {
+    if (summary.itemCount > 0) {
+      setPartyDataMap(prev => ({
+        ...prev,
+        dhruvi: summary
+      }));
+    } else {
+      setPartyDataMap(prev => {
+        const copy = { ...prev };
+        delete copy.dhruvi;
+        return copy;
+      });
+    }
+    setShowDhruviModal(false);
+  };
+
+  const handleDhruviClear = () => {
+    setPartyDataMap(prev => {
+      const copy = { ...prev };
+      delete copy.dhruvi;
+      return copy;
+    });
+    setShowDhruviModal(false);
+  };
+
+  // Method 1: Live JSON Web Scraper Auto-Fill (Untouched Original)
   const handleTriggerLiveSync = async () => {
     setBotLoading(true);
     setBotStatus('Fetching live data via CBO Scraper...');
@@ -235,7 +265,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
     }
   };
 
-  // Method 2: Fetch CBO Excel in Background & Auto-Parse
+  // Method 2: Fetch CBO Excel in Background & Auto-Parse (Untouched Original)
   const handleFetchAndParseCboExcel = async () => {
     setExcelLoading(true);
     setBotError(null);
@@ -259,7 +289,6 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
       const blob = await res.blob();
       const excelFile = new File([blob], `CBO_Primary_${fromMonth}.xls`, { type: 'application/vnd.ms-excel' });
 
-      // Run our internal excel parser
       const parsedSummary = await parsePrimaryFile(excelFile, 'Company Primary Dispatch (Live CBO Excel)');
 
       setPrimaryData(parsedSummary);
@@ -282,6 +311,13 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
   const handleRemoveParty = (partyId: string) => {
     if (partyId === 'primary') {
       setPrimaryData(null);
+    } else if (partyId === 'dhruvi') {
+      memoryStore.dhruviEntries = {};
+      setPartyDataMap(prev => {
+        const copy = { ...prev };
+        delete copy.dhruvi;
+        return copy;
+      });
     } else {
       setPartyDataMap(prev => {
         const copy = { ...prev };
@@ -295,6 +331,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
     if (window.confirm('Are you sure you want to reset all data on the screen?')) {
       setPartyDataMap({});
       setPrimaryData(null);
+      memoryStore.dhruviEntries = {};
       setTableSearch('');
     }
   };
@@ -316,7 +353,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         
         <div className="flex items-center gap-3">
           <span className="text-[11px] bg-cyan-950 text-cyan-300 border border-cyan-500/40 px-3 py-1 rounded-full font-mono font-bold flex items-center gap-1.5 shadow-lg shadow-cyan-950/50">
-            <Sparkles size={13} className="text-cyan-400 animate-pulse" /> DIOS V51.0 (DUAL LIVE CBO ENGINE)
+            <Sparkles size={13} className="text-cyan-400 animate-pulse" /> DIOS V53.0 (WITH DHRUVI MANUAL SLOT)
           </span>
           <span className="text-xs text-slate-400 font-medium">Month:</span>
           <select
@@ -341,7 +378,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
             DIOS Statement Aggregator
           </h1>
           <p className="text-slate-400 text-xs md:text-sm mt-1">
-            Unit Sales Progression (HQ Total) • Primary (NET PRI) + Secondary (NET SEC) + Closing Stock
+            Unit Sales Progression (HQ Total) • 6 Local Distributors + Dhruvi (Manual Math) + CBO Primary
           </p>
         </div>
 
@@ -368,7 +405,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         </div>
       </div>
 
-      {/* 🚀 DUAL PRIMARY ENGINE CARD */}
+      {/* PRIMARY ENGINE CARD */}
       <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-blue-950/60 via-slate-900 to-indigo-950/60 border border-blue-500/40 shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -424,20 +461,21 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         </div>
       </div>
 
-      {/* 6 INDIVIDUAL DISTRIBUTOR SLOTS */}
+      {/* 7 DISTRIBUTOR SLOTS (6 Statement Uploads + Dhruvi Manual Slot) */}
       <div className="mb-8">
         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-between">
           <span className="flex items-center gap-2">
-            <Layers size={14} className="text-cyan-400" /> Distributor Secondary Slots ({activePartyNames.length}/6 Active)
+            <Layers size={14} className="text-cyan-400" /> Distributor Secondary Slots ({activePartyNames.length}/7 Active)
           </span>
-          <span className="text-[11px] text-slate-500 normal-case">Upload XLS, XLSX, CSV or PDF files individually</span>
+          <span className="text-[11px] text-slate-500 normal-case">6 Statement Uploads + Dhruvi Manual Formula Sheet</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {PARTIES_CONFIG.map((party) => {
             const data = partyDataMap[party.id];
             const isUploaded = !!data;
             const isLoading = loadingPartyId === party.id;
+            const isDhruvi = party.isManual;
 
             return (
               <div
@@ -445,6 +483,8 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
                 className={`p-4 rounded-2xl border transition relative flex flex-col justify-between ${
                   isUploaded 
                     ? 'bg-emerald-950/30 border-emerald-500/50 shadow-lg shadow-emerald-950/40' 
+                    : isDhruvi
+                    ? 'bg-amber-950/20 border-amber-500/40 hover:border-amber-400'
                     : 'bg-slate-900/70 border-slate-800 hover:border-slate-700'
                 }`}
               >
@@ -452,18 +492,19 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div>
                       <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                        <Building2 size={16} className={isUploaded ? 'text-emerald-400' : 'text-slate-500'} />
+                        <Building2 size={16} className={isUploaded ? 'text-emerald-400' : isDhruvi ? 'text-amber-400' : 'text-slate-500'} />
                         {party.name}
                         {isUploaded && <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />}
+                        {isDhruvi && <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded font-mono">Manual</span>}
                       </h3>
-                      <p className="text-[11px] text-slate-400">{party.location} • <span className="text-cyan-400">{party.software}</span></p>
+                      <p className="text-[11px] text-slate-400">{party.location} • <span className={isDhruvi ? 'text-amber-400 font-semibold' : 'text-cyan-400'}>{party.software}</span></p>
                     </div>
 
                     {isUploaded && (
                       <button
                         onClick={() => handleRemoveParty(party.id)}
                         className="p-1 text-slate-500 hover:text-rose-400 rounded-lg transition cursor-pointer"
-                        title="Remove file"
+                        title="Remove"
                       >
                         <Trash2 size={15} />
                       </button>
@@ -473,7 +514,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
                   {isUploaded && (
                     <div className="my-2.5 p-2.5 bg-slate-950/90 rounded-xl border border-emerald-500/30 text-xs space-y-1">
                       <div className="flex justify-between text-slate-400">
-                        <span>File:</span> <span className="text-slate-200 font-mono truncate max-w-[140px]">{data.fileName}</span>
+                        <span>Status:</span> <span className="text-emerald-300 font-bold">{data.fileName}</span>
                       </div>
                       <div className="flex justify-between text-slate-400">
                         <span>Sales Units:</span> <span className="text-cyan-400 font-bold">{data.totalSales.toLocaleString()}</span>
@@ -486,25 +527,40 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
                 </div>
 
                 <div className="mt-3">
-                  <label className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold cursor-pointer transition ${
-                    isUploaded 
-                      ? 'bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300' 
-                      : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-md shadow-cyan-600/20'
-                  }`}>
-                    <Upload size={14} className={isLoading ? 'animate-spin' : ''} />
-                    {isLoading ? 'Processing File...' : isUploaded ? 'Replace Statement' : 'Upload Statement'}
-                    <input
-                      type="file"
-                      accept=".xls,.xlsx,.csv,.pdf,application/pdf"
-                      disabled={isLoading}
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          handleSingleFileUpload(party.id, party.name, e.target.files[0]);
-                        }
-                      }}
-                      className="hidden"
-                    />
-                  </label>
+                  {isDhruvi ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowDhruviModal(true)}
+                      className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold cursor-pointer transition ${
+                        isUploaded 
+                          ? 'bg-amber-950/60 border border-amber-500/40 text-amber-300 hover:bg-amber-900/60' 
+                          : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                      }`}
+                    >
+                      <Edit3 size={14} />
+                      {isUploaded ? 'Edit Dhruvi Math Sheet' : 'Open Dhruvi Math Sheet'}
+                    </button>
+                  ) : (
+                    <label className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold cursor-pointer transition ${
+                      isUploaded 
+                        ? 'bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300' 
+                        : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-md shadow-cyan-600/20'
+                    }`}>
+                      <Upload size={14} className={isLoading ? 'animate-spin' : ''} />
+                      {isLoading ? 'Processing File...' : isUploaded ? 'Replace Statement' : 'Upload Statement'}
+                      <input
+                        type="file"
+                        accept=".xls,.xlsx,.csv,.pdf,application/pdf"
+                        disabled={isLoading}
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handleSingleFileUpload(party.id, party.name, e.target.files[0]);
+                          }
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
                 </div>
               </div>
             );
@@ -531,7 +587,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <div className="text-xs text-purple-400 uppercase font-semibold">Active Distributors</div>
-          <div className="text-xl font-bold text-purple-400 mt-1">{activePartyNames.length} / 6 Active</div>
+          <div className="text-xl font-bold text-purple-400 mt-1">{activePartyNames.length} / 7 Active</div>
           <div className="text-xs text-slate-400 mt-0.5">73 Master Products</div>
         </div>
       </div>
@@ -631,7 +687,15 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         </table>
       </div>
 
-      {/* 🤖 DUAL OPTION MODAL: CBO SYNC */}
+      {/* 🧮 DHRUVI ISOLATED MODAL (Rendered From Separate Component) */}
+      <DhruviManualModal
+        isOpen={showDhruviModal}
+        onClose={() => setShowDhruviModal(false)}
+        onSave={handleDhruviSave}
+        onClear={handleDhruviClear}
+      />
+
+      {/* CBO MODAL */}
       {showCboModal && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-cyan-500/30 rounded-3xl max-w-lg w-full p-6 shadow-2xl shadow-cyan-950/60">
@@ -641,10 +705,8 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
                   <Bot size={22} />
                 </span>
                 <div>
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    CBO Primary Sales Auto-Sync
-                  </h3>
-                  <p className="text-xs text-slate-400">Select Month & Choose Auto-Fetch Mode</p>
+                  <h3 className="text-base font-bold text-white">CBO Primary Sales Auto-Sync</h3>
+                  <p className="text-xs text-slate-400">Select Month &amp; Choose Auto-Fetch Mode</p>
                 </div>
               </div>
               <button 
@@ -655,7 +717,6 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
               </button>
             </div>
 
-            {/* From & To Selector Form */}
             <div className="grid grid-cols-2 gap-4 mb-5">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
@@ -690,7 +751,6 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
               </div>
             </div>
 
-            {/* Status Feedback */}
             {botStatus && !botError && (
               <div className="p-3.5 rounded-xl text-xs mb-4 bg-slate-950 border border-slate-800 text-cyan-300 flex items-center gap-2">
                 {(botLoading || excelLoading) ? <Loader2 size={16} className="animate-spin text-cyan-400" /> : <Check size={16} className="text-emerald-400" />}
@@ -698,7 +758,6 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
               </div>
             )}
 
-            {/* Error Feedback */}
             {botError && (
               <div className="p-3.5 rounded-xl text-xs mb-4 bg-rose-950/60 border border-rose-500/40 text-rose-300 space-y-2">
                 <div className="flex items-start gap-2">
@@ -711,7 +770,6 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
               </div>
             )}
 
-            {/* Dual Action Buttons */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
               <button
                 type="button"
@@ -748,7 +806,7 @@ export const DiosWorkspace: React.FC<Props> = ({ onBack }) => {
         </div>
       )}
 
-      {/* MODAL: SINGLE PRODUCT PARTY BREAKDOWN */}
+      {/* SINGLE PRODUCT BREAKDOWN MODAL */}
       {selectedProductForModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">

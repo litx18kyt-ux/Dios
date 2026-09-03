@@ -20,7 +20,7 @@ const borderDoubleBottom = {
 
 const styleTitle = {
   font: { name: 'Calibri', sz: 16, bold: true, color: { rgb: 'FFFFFF' } },
-  fill: { fgColor: { rgb: '0F172A' } }, // Dark Slate/Navy
+  fill: { fgColor: { rgb: '0F172A' } },
   alignment: { horizontal: 'center', vertical: 'center' }
 };
 
@@ -32,14 +32,14 @@ const styleSubTitle = {
 
 const stylePartyHeader = {
   font: { name: 'Calibri', sz: 11, bold: true, color: { rgb: 'FFFFFF' } },
-  fill: { fgColor: { rgb: '0369A1' } }, // Sky Blue Accent
+  fill: { fgColor: { rgb: '0369A1' } },
   alignment: { horizontal: 'center', vertical: 'center' },
   border: borderThin
 };
 
 const styleSubColHeader = {
   font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: '0F172A' } },
-  fill: { fgColor: { rgb: 'E2E8F0' } }, // Soft Gray
+  fill: { fgColor: { rgb: 'E2E8F0' } },
   alignment: { horizontal: 'center', vertical: 'center' },
   border: borderThin
 };
@@ -69,18 +69,25 @@ const styleCellHighlight = {
   border: borderThin
 };
 
+const styleCellHighlightPri = {
+  font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: '1D4ED8' } },
+  fill: { fgColor: { rgb: 'EFF6FF' } },
+  alignment: { horizontal: 'center', vertical: 'center' },
+  border: borderThin
+};
+
 const styleTotalRow = {
   font: { name: 'Calibri', sz: 11, bold: true, color: { rgb: '0F172A' } },
-  fill: { fgColor: { rgb: 'FEF08A' } }, // Soft Yellow Highlight
+  fill: { fgColor: { rgb: 'FEF08A' } },
   alignment: { horizontal: 'center', vertical: 'center' },
   border: borderDoubleBottom
 };
 
 export function exportToExcel(
-  products: AggregatedProduct[],
+  products: (AggregatedProduct & { netPri?: number; priValue?: number })[],
   selectedMonth: string,
   activeParties: string[],
-  summary: { totalSalesUnits: number; totalClosingUnits: number; totalSalesValue: number; totalClosingValue: number }
+  summary: { totalSalesUnits: number; totalClosingUnits: number; totalSalesValue: number; totalClosingValue: number; totalPriUnits?: number; totalPriValue?: number }
 ) {
   // =============================================================
   // SHEET 1: UN.SALES PROG (HQ TOTAL 12 MONTHS)
@@ -124,6 +131,7 @@ export function exportToExcel(
   });
   wsData.push(row4);
 
+  // 🎯 PRODUCTS ROWS: Injects exact p.netPri!
   products.forEach(p => {
     const row: any[] = [
       { v: p.sn, s: styleCellCenter },
@@ -133,8 +141,9 @@ export function exportToExcel(
 
     MONTHS.forEach(m => {
       if (m.toUpperCase() === selectedMonth.toUpperCase()) {
+        const priVal = p.netPri !== undefined && p.netPri !== 0 ? p.netPri : 0;
         row.push(
-          { v: '-', s: styleCellCenter },
+          { v: priVal, s: priVal !== 0 ? styleCellHighlightPri : styleCellCenter },
           { v: p.netSec > 0 ? p.netSec : 0, s: p.netSec > 0 ? styleCellHighlight : styleCellCenter },
           { v: p.closing > 0 ? p.closing : 0, s: p.closing > 0 ? styleCellHighlight : styleCellCenter }
         );
@@ -150,6 +159,11 @@ export function exportToExcel(
     wsData.push(row);
   });
 
+  // 🎯 GRAND TOTAL (UNITS) ROW: Primary Included!
+  const totPriUnits = summary.totalPriUnits !== undefined 
+    ? summary.totalPriUnits 
+    : products.reduce((acc, p) => acc + (p.netPri || 0), 0);
+
   const rowTotal: any[] = [
     { v: 'Σ', s: styleTotalRow },
     { v: 'GRAND TOTAL (UNITS)', s: { ...styleTotalRow, alignment: { horizontal: 'left', vertical: 'center' } } },
@@ -158,7 +172,7 @@ export function exportToExcel(
   MONTHS.forEach(m => {
     if (m.toUpperCase() === selectedMonth.toUpperCase()) {
       rowTotal.push(
-        { v: '-', s: styleTotalRow },
+        { v: totPriUnits, s: { ...styleTotalRow, font: { bold: true, color: { rgb: '1D4ED8' } } } },
         { v: summary.totalSalesUnits, s: styleTotalRow },
         { v: summary.totalClosingUnits, s: styleTotalRow }
       );
@@ -172,6 +186,11 @@ export function exportToExcel(
   });
   wsData.push(rowTotal);
 
+  // 🎯 TOTAL VALUE (RUPEES) ROW: Primary Rupee Value Included!
+  const totPriVal = summary.totalPriValue !== undefined 
+    ? summary.totalPriValue 
+    : products.reduce((acc, p) => acc + (p.priValue || ((p.netPri || 0) * p.pts)), 0);
+
   const rowValue: any[] = [
     { v: '₹', s: styleTotalRow },
     { v: 'TOTAL VALUE (RUPEES)', s: { ...styleTotalRow, alignment: { horizontal: 'left', vertical: 'center' } } },
@@ -180,7 +199,7 @@ export function exportToExcel(
   MONTHS.forEach(m => {
     if (m.toUpperCase() === selectedMonth.toUpperCase()) {
       rowValue.push(
-        { v: '-', s: styleTotalRow },
+        { v: `₹ ${Math.round(totPriVal).toLocaleString()}`, s: { ...styleTotalRow, font: { bold: true, color: { rgb: '1D4ED8' } } } },
         { v: `₹ ${Math.round(summary.totalSalesValue).toLocaleString()}`, s: styleTotalRow },
         { v: `₹ ${Math.round(summary.totalClosingValue).toLocaleString()}`, s: styleTotalRow }
       );
@@ -213,18 +232,18 @@ export function exportToExcel(
     { wch: 12 },
   ];
   MONTHS.forEach(() => {
-    colWidths.push({ wch: 10 }, { wch: 12 }, { wch: 14 });
+    colWidths.push({ wch: 11 }, { wch: 11 }, { wch: 12 });
   });
   ws['!cols'] = colWidths;
   ws['!rows'] = [{ hpt: 30 }, { hpt: 22 }, { hpt: 22 }, { hpt: 20 }];
 
   // =============================================================
-  // SHEET 2: 2-TIER PARTY BREAKDOWN (SEC & CLOSING UNDER PARTY)
+  // SHEET 2: 2-TIER PARTY BREAKDOWN
   // =============================================================
   const bData: any[][] = [];
   const bTotalCols = 3 + activeParties.length * 2 + 2;
 
-  // Row 1: Party Headers (Merged across 2 columns: SEC & CLOSING)
+  // Row 1: Party Headers
   const bRow1: any[] = [
     { v: 'S.N.', s: styleSubColHeader },
     { v: 'PRODUCT NAME', s: styleSubColHeader },
@@ -242,7 +261,7 @@ export function exportToExcel(
   );
   bData.push(bRow1);
 
-  // Row 2: Sub-headers (SEC & CLOSING)
+  // Row 2: Sub-headers
   const bRow2: any[] = [
     { v: '', s: styleSubColHeader },
     { v: '', s: styleSubColHeader },
@@ -260,7 +279,7 @@ export function exportToExcel(
   );
   bData.push(bRow2);
 
-  // Data Rows: 73 Master Products
+  // Data Rows
   products.forEach(p => {
     const row: any[] = [
       { v: p.sn, s: styleCellCenter },
@@ -327,11 +346,10 @@ export function exportToExcel(
 
   const wsBreakdown = XLSX.utils.aoa_to_sheet(bData);
 
-  // Merges for 2-Tier Breakdown Header
   wsBreakdown['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }, // S.N. vertical
-    { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }, // PRODUCT NAME vertical
-    { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } }, // PTS vertical
+    { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },
+    { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },
+    { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } },
   ];
 
   activeParties.forEach((_, idx) => {
@@ -348,7 +366,6 @@ export function exportToExcel(
     e: { r: 0, c: totStartCol + 1 }
   });
 
-  // Column Widths for Breakdown
   const bCols: any[] = [
     { wch: 6 },
     { wch: 35 },
@@ -358,6 +375,7 @@ export function exportToExcel(
     bCols.push({ wch: 11 }, { wch: 12 });
   });
   bCols.push({ wch: 14 }, { wch: 16 });
+
   wsBreakdown['!cols'] = bCols;
   wsBreakdown['!rows'] = [{ hpt: 24 }, { hpt: 20 }];
 
