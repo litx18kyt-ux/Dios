@@ -1,14 +1,27 @@
 #!/bin/bash
+cd /workspaces/Dios
+
+echo "========================================================"
+echo "🚀 STARTING DIOS UNIFIED BACKEND SERVER (PORT 8000)..."
+echo "========================================================"
+
 pkill -f uvicorn || true
-echo "🚀 Starting CBO Python Engine on Port 8000..."
-nohup uvicorn server:app --host 0.0.0.0 --port 8000 > /workspaces/Dios/server.log 2>&1 &
+sleep 1
+
+nohup python3 -m uvicorn server:app --host 0.0.0.0 --port 8000 > /workspaces/Dios/server.log 2>&1 &
 sleep 2
 
-echo "🌐 Making Port 8000 Public..."
-gh codespace ports visibility 8000:public -c $CODESPACE_NAME 2>/dev/null || true
+gh codespace ports visibility 8000:public -c "${CODESPACE_NAME:-redesigned-winner-gx7rv659g97vhp7r9}" 2>/dev/null || true
 
-echo ""
-echo "========================================================"
-echo "✅ CBO ENGINE IS NOW LIVE IN BACKGROUND!"
-echo "Ab aap https://dios-hub.pages.dev par jakar 'Fetch & Auto-Fill Table' dabayein."
-echo "========================================================"
+CHECK=$(curl -s http://127.0.0.1:8000/ || echo "OFFLINE")
+
+if [[ "$CHECK" == *"online"* ]]; then
+  echo "✅ SERVER IS 100% LIVE & ACTIVE!"
+  echo "📡 Version: v61.0 (All 4 Engines Unified)"
+  echo "🌐 Public URL: https://${CODESPACE_NAME:-redesigned-winner-gx7rv659g97vhp7r9}-8000.app.github.dev"
+  echo "========================================================"
+else
+  echo "❌ Error starting server. server.log:"
+  cat /workspaces/Dios/server.log | tail -n 10
+  echo "========================================================"
+fi
