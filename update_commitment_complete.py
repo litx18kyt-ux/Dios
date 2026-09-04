@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import os
+
+commitment_code = '''import React, { useState } from 'react';
 import { CheckCircle2, Save, Download, Check, RefreshCw, Plus, Trash2 } from 'lucide-react';
 import { memoryStore } from '../../data/memoryStore';
 
@@ -170,21 +172,21 @@ export const CommitmentSheet: React.FC = () => {
   };
 
   const handleExportCSV = () => {
-    let csv = `COMMITMENT OF MONTH\n`;
-    csv += `H.Q. NAME,PREVIOUS MONTH BUDGET,PREVIOUS MONTH ACH.,CURRENT SECONDARY,CURRENT INVENTORY,CURRENT MONTH BUDGET,COMMITMENT\n`;
-    csv += `UDAIPUR,${commitmentData.prevBudget},${commitmentData.prevAch},${commitmentData.currSec},${commitmentData.currInventory},${commitmentData.currBudget},${commitmentData.commitmentVal}\n\n`;
+    let csv = `COMMITMENT OF MONTH\\n`;
+    csv += `H.Q. NAME,PREVIOUS MONTH BUDGET,PREVIOUS MONTH ACH.,CURRENT SECONDARY,CURRENT INVENTORY,CURRENT MONTH BUDGET,COMMITMENT\\n`;
+    csv += `UDAIPUR,${commitmentData.prevBudget},${commitmentData.prevAch},${commitmentData.currSec},${commitmentData.currInventory},${commitmentData.currBudget},${commitmentData.commitmentVal}\\n\\n`;
     
-    csv += `12-MONTH COMMITMENT & ACHIEVEMENT\n`;
-    csv += `MONTH,COMMITMENT,ACHIEVEMENT\n`;
+    csv += `12-MONTH COMMITMENT & ACHIEVEMENT\\n`;
+    csv += `MONTH,COMMITMENT,ACHIEVEMENT\\n`;
     MONTHS_DATA.forEach(m => {
       const item = monthlyCA[m.code] || { commitment: '', achievement: '' };
-      csv += `${m.label},${item.commitment},${item.achievement}\n`;
+      csv += `${m.label},${item.commitment},${item.achievement}\\n`;
     });
 
-    csv += `\nSUPPORT REQUIREMENT\n`;
-    csv += `S.N.,H.Q.NAME,DR.NAME,TYPE OF SUPPORT,AMOUNT,EXPECTED ROI\n`;
+    csv += `\\nSUPPORT REQUIREMENT\\n`;
+    csv += `S.N.,H.Q.NAME,DR.NAME,TYPE OF SUPPORT,AMOUNT,EXPECTED ROI\\n`;
     doctorsRows.forEach(d => {
-      csv += `${d.sn},${d.hq},"${d.drName}","${d.typeOfSupport}",${d.amount},${d.expectedRoi}\n`;
+      csv += `${d.sn},${d.hq},"${d.drName}","${d.typeOfSupport}",${d.amount},${d.expectedRoi}\\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -462,3 +464,8 @@ export const CommitmentSheet: React.FC = () => {
     </div>
   );
 };
+'''
+
+with open('src/components/review/CommitmentSheet.tsx', 'w') as f:
+    f.write(commitment_code)
+print('✅ CommitmentSheet.tsx updated with Top Summary Box, 12M Grid, and Support Table!')
