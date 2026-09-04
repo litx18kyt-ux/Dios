@@ -50,6 +50,7 @@ export const memoryStore = {
   dhruviManualPtsTotal: '' as string,
   dhruviValuationMode: 'PTS' as DhruviValuationMode,
   expiryData: null as Record<number, any> | null,
+  mslData: null as any[] | null,
   beName: 'BANWARI LAL MEENA',
   hqName: 'UDAIPUR',
   lastSyncedMonthCode: 'AUG'

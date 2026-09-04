@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import os
+
+msl_code = '''import React, { useState } from 'react';
 import { Calendar, Search, Save, Download, Check, Plus, Trash2 } from 'lucide-react';
 import { memoryStore } from '../../data/memoryStore';
 
@@ -190,11 +192,11 @@ export const MslSheet: React.FC = () => {
   };
 
   const handleExportCSV = () => {
-    let csv = `,,,,,,VISIT DATES,,,,,,,,,,\n`;
-    csv += `SrNo,Doctor Name,Activity Type,Speciality,DOB,DOA,APR,MAY,JUN,JUL,AUG,SEPT,OCT,NOV,DEC,JAN,FEB,MAR\n`;
+    let csv = `,,,,,,VISIT DATES,,,,,,,,,,\\n`;
+    csv += `SrNo,Doctor Name,Activity Type,Speciality,DOB,DOA,APR,MAY,JUN,JUL,AUG,SEPT,OCT,NOV,DEC,JAN,FEB,MAR\\n`;
     
     doctors.forEach(d => {
-      csv += `${d.srNo},"${d.doctorName}","${d.activityType}","${d.speciality}","${d.dob}","${d.doa}","${d.apr}","${d.may}","${d.jun}","${d.jul}","${d.aug}","${d.sept}","${d.oct}","${d.nov}","${d.dec}","${d.jan}","${d.feb}","${d.mar}"\n`;
+      csv += `${d.srNo},"${d.doctorName}","${d.activityType}","${d.speciality}","${d.dob}","${d.doa}","${d.apr}","${d.may}","${d.jun}","${d.jul}","${d.aug}","${d.sept}","${d.oct}","${d.nov}","${d.dec}","${d.jan}","${d.feb}","${d.mar}"\\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -266,7 +268,7 @@ export const MslSheet: React.FC = () => {
             <tr>
               <th className="p-2.5 text-center w-12">SrNo</th>
               <th className="p-2.5 min-w-[200px]">Doctor Name</th>
-              <th className="p-2.5 min-w-[150px]">Activity Type</th>
+              <th className="p-2.5 min-w-[130px]">Activity Type</th>
               <th className="p-2.5 min-w-[160px]">Speciality</th>
               <th className="p-2.5 text-center w-24">DOB</th>
               <th className="p-2.5 text-center w-24">DOA</th>
@@ -361,3 +363,8 @@ export const MslSheet: React.FC = () => {
     </div>
   );
 };
+'''
+
+with open('src/components/review/MslSheet.tsx', 'w') as f:
+    f.write(msl_code)
+print('✅ MslSheet.tsx updated with all 123+ master doctors and full month columns!')
