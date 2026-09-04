@@ -8,6 +8,7 @@ import {
 import { MASTER_PRODUCTS } from '../data/masterProducts';
 import { parsePartyFile, parsePrimaryFile, PartyParseSummary, matchMasterProduct } from '../parsers';
 import { exportToExcel } from '../utils/excelExporter';
+import { unProgressionStore, MONTH_CODES } from '../data/unProgressionStore';
 import { AggregatedProduct } from '../parsers/common';
 import { DhruviManualModal } from './DhruviManualModal';
 import { memoryStore } from '../data/memoryStore';
@@ -336,6 +337,13 @@ export const DiosWorkspace: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     }
   };
 
+    // 💾 Sync Aggregated Month to Data Hub (Un. Sales Prog)
+  const handleSyncToDataHub = () => {
+    const mCode = selectedMonth.substring(0, 3).toUpperCase();
+    unProgressionStore.syncFromAggregator(mCode, products);
+    alert(`🎉 SUCCESS! Synced ${selectedMonth} (${products.reduce((a,b)=>a+b.netSec,0)} Sales Units, ${products.reduce((a,b)=>a+b.closing,0)} Closing Units) to Data Hub (4. Un. Sales Prog)!`);
+  };
+
   const handleExport = () => {
     exportToExcel(products as any, selectedMonth, activePartyNames, summary);
   };
@@ -391,6 +399,14 @@ export const DiosWorkspace: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               <RefreshCw size={14} /> Reset All
             </button>
           )}
+                    <button
+            onClick={handleSyncToDataHub}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/20 transition cursor-pointer"
+            title="Save and Push aggregated data into Data Hub Un. Sales Prog"
+          >
+            <Zap size={15} className="text-yellow-300" /> 💾 Sync to Data Hub
+          </button>
+
           <button
             onClick={handleExport}
             disabled={activePartyNames.length === 0 && !primaryData}
