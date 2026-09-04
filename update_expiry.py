@@ -1,4 +1,21 @@
-import React, { useState } from 'react';
+import os
+
+# 1. Update memoryStore.ts to hold expiryData persistence
+mem_path = 'src/data/memoryStore.ts'
+with open(mem_path, 'r') as f:
+    mem_code = f.read()
+
+if 'expiryData' not in mem_code:
+    mem_code = mem_code.replace(
+        "beName: 'BANWARI LAL MEENA',",
+        "expiryData: null as Record<number, any> | null,\n  beName: 'BANWARI LAL MEENA',"
+    )
+    with open(mem_path, 'w') as f:
+        f.write(mem_code)
+    print('✅ Updated memoryStore.ts with expiryData persistence!')
+
+# 2. Create interactive NearByExpirySheet.tsx matching standard CSV format
+expiry_sheet_code = '''import React, { useState } from 'react';
 import { AlertTriangle, Save, Download, Check, RefreshCw } from 'lucide-react';
 import { memoryStore } from '../../data/memoryStore';
 
@@ -62,11 +79,11 @@ export const NearByExpirySheet: React.FC = () => {
   };
 
   const handleExportCSV = () => {
-    let csv = `DETAILS OF PRODUCTS HAVING LESS THAN 8 MONTHS EXPIRY,,,,,,\n`;
-    csv += `S. NO,PRODUCT,HQ,STOCKIST NAME,QUANTITY,MONTH OF EXPIRY,PLAN OF LIQUIDATION\n`;
+    let csv = `DETAILS OF PRODUCTS HAVING LESS THAN 8 MONTHS EXPIRY,,,,,,\\n`;
+    csv += `S. NO,PRODUCT,HQ,STOCKIST NAME,QUANTITY,MONTH OF EXPIRY,PLAN OF LIQUIDATION\\n`;
     
     rows.forEach(r => {
-      csv += `${r.sn},"${r.product}","${r.hq}","${r.stockistName}","${r.quantity}","${r.monthOfExpiry}","${r.planOfLiquidation}"\n`;
+      csv += `${r.sn},"${r.product}","${r.hq}","${r.stockistName}","${r.quantity}","${r.monthOfExpiry}","${r.planOfLiquidation}"\\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -178,3 +195,8 @@ export const NearByExpirySheet: React.FC = () => {
     </div>
   );
 };
+'''
+
+with open('src/components/review/NearByExpirySheet.tsx', 'w') as f:
+    f.write(expiry_sheet_code)
+print('✅ NearByExpirySheet.tsx updated successfully!')

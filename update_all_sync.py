@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import os
+
+# 1. Update UnSalesProgSheet.tsx with fixed cell widths, clear button, and sync bridge
+sheet_code = '''import React, { useState } from 'react';
 import { Table2, Search, Zap, Save, Download, Check, Info, Trash2, RefreshCw } from 'lucide-react';
 import { MASTER_PRODUCTS } from '../../data/masterProducts';
 import { unProgressionStore, MONTH_CODES } from '../../data/unProgressionStore';
@@ -72,8 +75,8 @@ export const UnSalesProgSheet: React.FC = () => {
   };
 
   const handleExportCSV = () => {
-    let csv = `UNIT SALES PROGRESSION (HQ TOTAL)\n`;
-    csv += `S.N.,PRODUCT NAME,PTS,` + MONTH_CODES.map(m => `${m} PRI,${m} SEC,${m} CL`).join(',') + `,CUMM PRI,CUMM SEC,CUMM CL,TOTAL SEC VAL (Rs)\n`;
+    let csv = `UNIT SALES PROGRESSION (HQ TOTAL)\\n`;
+    csv += `S.N.,PRODUCT NAME,PTS,` + MONTH_CODES.map(m => `${m} PRI,${m} SEC,${m} CL`).join(',') + `,CUMM PRI,CUMM SEC,CUMM CL,TOTAL SEC VAL (Rs)\\n`;
     
     MASTER_PRODUCTS.forEach(p => {
       let cummPri = 0;
@@ -90,7 +93,7 @@ export const UnSalesProgSheet: React.FC = () => {
       });
 
       const totalVal = cummSec * p.pts;
-      csv += `${p.sn},"${p.name}",${p.pts.toFixed(2)},${mCells.join(',')},${cummPri},${cummSec},${cummCl},${Math.round(totalVal)}\n`;
+      csv += `${p.sn},"${p.name}",${p.pts.toFixed(2)},${mCells.join(',')},${cummPri},${cummSec},${cummCl},${Math.round(totalVal)}\\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -409,3 +412,8 @@ export const UnSalesProgSheet: React.FC = () => {
     </div>
   );
 };
+'''
+
+with open('src/components/review/UnSalesProgSheet.tsx', 'w') as f:
+    f.write(sheet_code)
+print('✅ UnSalesProgSheet.tsx updated with fixed cell widths & performance sync!')

@@ -1,4 +1,6 @@
-import React, { useState, useRef } from 'react';
+import os
+
+sheet_code = r'''import React, { useState, useRef } from 'react';
 import { 
   TrendingUp, Bot, Loader2, Save, Download, Check, AlertTriangle, 
   MessageSquare, Plus, Trash2, X, Info, UploadCloud, RefreshCw
@@ -64,59 +66,16 @@ const INITIAL_BASE: Record<string, Record<string, string>> = {
   investment: { APR: '12.5k', MAY: '150k', JUN: '0', JUL: '', AUG: '', SEP: '', OCT: '', NOV: '', DEC: '', JAN: '', FEB: '', MAR: '' },
 };
 
-
-import React, { Component, ErrorInfo, ReactNode } from 'react';
-
-class SalesPerformanceErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean, error: any}> {
-  state = { hasError: false, error: null };
-  static getDerivedStateFromError(error: any) {
-    return { hasError: true, error };
-  }
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("SalesPerformance Error:", error, errorInfo);
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="p-6 bg-rose-950/90 border-2 border-rose-500 text-rose-200 rounded-3xl space-y-3 shadow-2xl m-4">
-          <h3 className="font-bold text-lg flex items-center gap-2">⚠️ Sales Performance Crash Error</h3>
-          <p className="text-xs text-rose-300">Yeh error blank screen ki vajah ban raha tha:</p>
-          <div className="bg-slate-950 p-4 rounded-2xl border border-rose-900 space-y-2">
-            <div className="text-sm font-bold text-white font-mono">Exact Error Message:</div>
-            <div className="text-sm text-rose-300 font-mono bg-rose-950/50 p-3 rounded-xl border border-rose-800">
-              {String(this.state.error?.message || this.state.error)}
-            </div>
-          </div>
-          <button 
-            onClick={() => { localStorage.clear(); window.location.reload(); }}
-            className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold cursor-pointer"
-          >
-            Clear Memory &amp; Reload App
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
 export const SalesPerformanceSheet: React.FC = () => {
-  return (
-    <SalesPerformanceErrorBoundary>
-      <SalesPerformanceContent />
-    </SalesPerformanceErrorBoundary>
-  );
-};
-
-const SalesPerformanceContent: React.FC = () => {
-
   const [selectedMonth, setSelectedMonth] = useState('Aug-2026');
+  
   const [formData, setFormData] = useState<Record<string, Record<string, string>>>(() => {
-  if (!memoryStore.salesPerformanceData) {
-    memoryStore.salesPerformanceData = INITIAL_BASE;
-  }
-  return memoryStore.salesPerformanceData;
-});
+    if (!memoryStore.salesPerformanceData) {
+      memoryStore.salesPerformanceData = INITIAL_BASE;
+    }
+    return memoryStore.salesPerformanceData;
+  });
+
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -124,7 +83,6 @@ const SalesPerformanceContent: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 📝 Modal State for Remarks / Party Breakdown
   const [activeModal, setActiveModal] = useState<{
     rowId: string;
     rowName: string;
@@ -169,15 +127,18 @@ const SalesPerformanceContent: React.FC = () => {
     const key = `${activeModal.rowId}_${activeModal.month}`;
     memoryStore.salesBreakdown[key] = modalItems;
 
-    // Auto calculate total and update ONLY this specific month cell value
     const total = modalItems.reduce((sum, it) => sum + (parseFloat(String(it.amount)) || 0), 0);
-    setFormData(prev => ({
-      ...prev,
-      [activeModal.rowId]: {
-        ...prev[activeModal.rowId],
-        [activeModal.month]: total > 0 ? String(total) : '0'
-      }
-    }));
+    setFormData(prev => {
+      const updated = {
+        ...prev,
+        [activeModal.rowId]: {
+          ...prev[activeModal.rowId],
+          [activeModal.month]: total > 0 ? String(total) : '0'
+        }
+      };
+      memoryStore.salesPerformanceData = updated;
+      return updated;
+    });
 
     setActiveModal(null);
   };
@@ -196,7 +157,7 @@ const SalesPerformanceContent: React.FC = () => {
     });
   };
 
-    const handleAutoSyncFromDataHub = () => {
+  const handleAutoSyncFromDataHub = () => {
     const gridData = unProgressionStore.getData();
     const newSecCurr: Record<string, string> = { ...(formData.sec_curr || {}) };
     const newClosingStock: Record<string, string> = { ...(formData.closing_stock || {}) };
@@ -304,7 +265,6 @@ const SalesPerformanceContent: React.FC = () => {
     return hasNumeric ? (sum > 1000 ? Math.round(sum).toLocaleString() : sum.toFixed(2)) : '-';
   };
 
-  // 🤖 1. AUTO-FETCH CBO SALES (Multi-Month safe)
   const handleFetchFromCbo = async () => {
     setLoading(true);
     setErrorMsg(null);
@@ -327,12 +287,16 @@ const SalesPerformanceContent: React.FC = () => {
       const data = await res.json();
 
       if (data && data.success) {
-        setFormData(prev => ({
-          ...prev,
-          primary_curr: { ...prev.primary_curr, [targetCode]: String(data.net_sales_lacs || '0') },
-          sales_returns: { ...prev.sales_returns, [targetCode]: String(data.sales_return || '0') },
-          expiry: { ...prev.expiry, [targetCode]: String(data.expiry || '0') },
-        }));
+        setFormData(prev => {
+          const updated = {
+            ...prev,
+            primary_curr: { ...prev.primary_curr, [targetCode]: String(data.net_sales_lacs || '0') },
+            sales_returns: { ...prev.sales_returns, [targetCode]: String(data.sales_return || '0') },
+            expiry: { ...prev.expiry, [targetCode]: String(data.expiry || '0') },
+          };
+          memoryStore.salesPerformanceData = updated;
+          return updated;
+        });
 
         if (data.sales_return_breakdown) {
           memoryStore.salesBreakdown[`sales_returns_${targetCode}`] = data.sales_return_breakdown;
@@ -353,7 +317,6 @@ const SalesPerformanceContent: React.FC = () => {
     }
   };
 
-  // 📂 2. DIRECT UPLOAD & PARSE SPO EXCEL (Instant In-Browser Processing)
   const handleUploadSpoExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -426,15 +389,17 @@ const SalesPerformanceContent: React.FC = () => {
 
       const netSalesLacs = (totalNetSales / 100000).toFixed(2);
 
-      // Update targeted month cleanly in React state
-      setFormData(prev => ({
-        ...prev,
-        primary_curr: { ...prev.primary_curr, [targetCode]: netSalesLacs },
-        sales_returns: { ...prev.sales_returns, [targetCode]: String(Math.round(totalGoodsReturn)) },
-        expiry: { ...prev.expiry, [targetCode]: String(Math.round(totalBreakageExpiry)) }
-      }));
+      setFormData(prev => {
+        const updated = {
+          ...prev,
+          primary_curr: { ...prev.primary_curr, [targetCode]: netSalesLacs },
+          sales_returns: { ...prev.sales_returns, [targetCode]: String(Math.round(totalGoodsReturn)) },
+          expiry: { ...prev.expiry, [targetCode]: String(Math.round(totalBreakageExpiry)) }
+        };
+        memoryStore.salesPerformanceData = updated;
+        return updated;
+      });
 
-      // Store remarks breakdown in memoryStore
       memoryStore.salesBreakdown[`sales_returns_${targetCode}`] = returnBreakdown;
       memoryStore.salesBreakdown[`expiry_${targetCode}`] = expiryBreakdown;
 
@@ -448,7 +413,6 @@ const SalesPerformanceContent: React.FC = () => {
     }
   };
 
-  // 📊 3. EXPORT EXCEL WITH NATIVE HOVER COMMENTS
   const handleExportExcelWithComments = () => {
     const wb = XLSX.utils.book_new();
     const headers = ['S.N.', 'PARTICULARS', ...MONTHS, 'CUMM'];
@@ -482,14 +446,14 @@ const SalesPerformanceContent: React.FC = () => {
           const key = `${row.id}_${m}`;
           const items = memoryStore.salesBreakdown[key];
           if (items && items.length > 0) {
-            const commentLines = items.map(it => `• ${it.partyName}: ₹${Number(it.amount).toLocaleString()} ${it.note ? '(' + it.note + ')' : ''}`);
+            const commentLines = items.map(it => \`• \${it.partyName}: ₹\${Number(it.amount).toLocaleString()} \${it.note ? '(' + it.note + ')' : ''}\`);
             cellObj.c = [
               {
                 a: 'DIOS Review System',
-                t: `Party-wise Breakdown (${row.name} - ${m}):\n${commentLines.join('\n')}\nTotal: ₹${Number(val).toLocaleString()}`
+                t: \`Party-wise Breakdown (\${row.name} - \${m}):\\n\${commentLines.join('\\n')}\\nTotal: ₹\${Number(val).toLocaleString()}\`
               }
             ];
-            cellObj.s.fill = { fgColor: { rgb: 'FEF3C7' } }; // Yellow tint
+            cellObj.s.fill = { fgColor: { rgb: 'FEF3C7' } };
           }
         }
 
@@ -508,7 +472,7 @@ const SalesPerformanceContent: React.FC = () => {
     ws['!cols'] = [{ wch: 6 }, { wch: 32 }, ...MONTHS.map(() => ({ wch: 11 })), { wch: 14 }];
 
     XLSX.utils.book_append_sheet(wb, ws, 'Sales Performance');
-    XLSX.writeFile(wb, `Sales_Performance_Review_${selectedMonth}.xlsx`);
+    XLSX.writeFile(wb, \`Sales_Performance_Review_\${selectedMonth}.xlsx\`);
   };
 
   const handleSave = () => {
@@ -528,10 +492,10 @@ const SalesPerformanceContent: React.FC = () => {
             <h2 className="text-base font-bold text-white flex items-center gap-2">
               3. SALES PERFORMANCE
               <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full font-mono flex items-center gap-1">
-                <MessageSquare size={10} /> Dual Mode (Fetch + Upload)
+                <MessageSquare size={10} /> Persistent Memory &amp; Auto-Sync
               </span>
             </h2>
-            <p className="text-xs text-slate-400">BE: BANWARI LAL MEENA • HQ: UDAIPUR • Net Primary Engine</p>
+            <p className="text-xs text-slate-400">BE: BANWARI LAL MEENA • HQ: UDAIPUR • Data Bridge Active</p>
           </div>
         </div>
 
@@ -552,16 +516,15 @@ const SalesPerformanceContent: React.FC = () => {
             </select>
           </div>
 
-          {/* 📂 Option 1: Direct File Upload */}
           <button
-        onClick={handleAutoSyncFromDataHub}
-        className="flex items-center gap-1.5 px-3.5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold shadow-md shadow-cyan-600/20 transition cursor-pointer"
-        title="Auto-sync Secondary 26-27 & Closing Stock from Data Hub"
-      >
-        <RefreshCw size={14} /> Auto-Sync Sec &amp; Stock
-      </button>
+            onClick={handleAutoSyncFromDataHub}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold shadow-md shadow-cyan-600/20 transition cursor-pointer"
+            title="Auto-sync Secondary 26-27 & Closing Stock from Data Hub"
+          >
+            <RefreshCw size={14} /> Auto-Sync Sec &amp; Stock
+          </button>
 
-      <label className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 transition cursor-pointer">
+          <label className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 transition cursor-pointer">
             <UploadCloud size={14} />
             Upload SPO Excel
             <input
@@ -573,7 +536,6 @@ const SalesPerformanceContent: React.FC = () => {
             />
           </label>
 
-          {/* ⚡ Option 2: Live Auto-Fetch */}
           <button
             onClick={handleFetchFromCbo}
             disabled={loading}
@@ -583,7 +545,6 @@ const SalesPerformanceContent: React.FC = () => {
             Auto-Fetch {selectedMonth}
           </button>
 
-          {/* 📊 Option 3: Export with Comments */}
           <button
             onClick={handleExportExcelWithComments}
             className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 transition cursor-pointer"
@@ -619,7 +580,7 @@ const SalesPerformanceContent: React.FC = () => {
       <div className="flex items-center gap-2 px-3 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-slate-400">
         <Info size={14} className="text-amber-400 shrink-0" />
         <span>
-          Aap chahe <b>"Auto-Fetch"</b> karein ya CBO se download ki hui <b>"Upload SPO Excel"</b> karein — dono se <b>Net Primary (4.32L)</b>, <b>Returns (₹5,590)</b> aur <b>Expiry (₹21,498)</b> stockist-wise load ho jayenge!
+          Data is now fully persisted in memory. Click <b>"Auto-Sync Sec &amp; Stock"</b> to pull Secondary 26-27 and Closing Stock directly from Data Hub!
         </span>
       </div>
 
@@ -710,7 +671,6 @@ const SalesPerformanceContent: React.FC = () => {
         </table>
       </div>
 
-      {/* 📝 STOCKIST REMARKS & BREAKDOWN MODAL */}
       {activeModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-amber-500/40 rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-4">
@@ -823,3 +783,8 @@ const SalesPerformanceContent: React.FC = () => {
     </div>
   );
 };
+'''
+
+with open('src/components/review/SalesPerformanceSheet.tsx', 'w') as f:
+    f.write(sheet_code)
+print('✅ SalesPerformanceSheet.tsx fixed with raw string and deployed successfully!')

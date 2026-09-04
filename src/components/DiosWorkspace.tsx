@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  ArrowLeft, Upload, FileSpreadsheet, Download, CheckCircle2, 
+  ArrowLeft, Zap, Upload, FileSpreadsheet, Download, CheckCircle2, 
   Trash2, Eye, X, RefreshCw, Layers, Building2, Search, Calculator,
   Package, Bot, Sparkles, Check, Loader2, Calendar, AlertTriangle, 
   FileSpreadsheet as ExcelIcon, Edit3

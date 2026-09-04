@@ -1,4 +1,4 @@
-import { INITIAL_UN_PROGRESSION_SEED, YearProgressionStore, ProductProgressionMap } from './seedUnSalesProg';
+store_code = """import { INITIAL_UN_PROGRESSION_SEED, YearProgressionStore, ProductProgressionMap } from './seedUnSalesProg';
 import { MASTER_PRODUCTS } from './masterProducts';
 
 const STORAGE_KEY = 'dios_un_sales_progression_v1';
@@ -89,3 +89,8 @@ export class UnProgressionStore {
 }
 
 export const unProgressionStore = new UnProgressionStore();
+"""
+
+with open('src/data/unProgressionStore.ts', 'w') as f:
+    f.write(store_code)
+print('✅ unProgressionStore.ts fixed cleanly!')

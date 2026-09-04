@@ -43,11 +43,13 @@ export const memoryStore = {
   dcrDataByMonth: {} as Record<string, FwDayEntry[]>,
   currentDcrMonth: 'Aug-2026',
   effortLevelData: null as Record<string, Record<string, string>> | null,
+  salesPerformanceData: null as Record<string, Record<string, string>> | null,
   salesBreakdown: {} as MonthBreakdownMap,
   dhruviEntries: {} as Record<number, DhruviProductEntry>,
   dhruviManualPtrTotal: '' as string,
   dhruviManualPtsTotal: '' as string,
   dhruviValuationMode: 'PTS' as DhruviValuationMode,
+  expiryData: null as Record<number, any> | null,
   beName: 'BANWARI LAL MEENA',
   hqName: 'UDAIPUR',
   lastSyncedMonthCode: 'AUG'
