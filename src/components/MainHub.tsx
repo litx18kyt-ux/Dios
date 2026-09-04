@@ -33,7 +33,7 @@ export const MainHub: React.FC<Props> = ({ onOpenProject }) => {
           </span>
           <div>
             <div className="text-xs font-black tracking-wide text-emerald-400 uppercase flex items-center gap-2">
-              <span>● SYSTEM V52.0 LIVE</span>
+              <span>● SYSTEM V56.0 LIVE (COMPACT & COLUMN TOGGLES)</span>
               <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-500/30">DUAL ENGINE READY</span>
             </div>
             <p className="text-xs text-slate-300 mt-0.5">

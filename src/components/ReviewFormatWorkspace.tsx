@@ -78,7 +78,7 @@ export const ReviewFormatWorkspace: React.FC<Props> = ({ onBack }) => {
 
         <div className="flex items-center gap-3">
           <span className="text-[11px] bg-emerald-950 text-emerald-300 border border-emerald-500/40 px-3 py-1 rounded-full font-mono font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-950/50">
-            <Sparkles size={13} className="text-emerald-400 animate-pulse" /> DIOS REVIEW HUB (14 MODULAR SHEETS)
+            <Sparkles size={13} className="text-emerald-400 animate-pulse" /> DIOS V55.0 REVIEW HUB (MSL FREEZE ACTIVE)
           </span>
         </div>
       </div>
