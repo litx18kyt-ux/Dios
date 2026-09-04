@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+modal_code = '''import React, { useState } from 'react';
 import { Calculator, Search, X, Check, Trash2, Edit3, Settings2 } from 'lucide-react';
 import { MASTER_PRODUCTS } from '../data/masterProducts';
 import { PartyParseSummary } from '../parsers/common';
@@ -415,3 +415,8 @@ export const DhruviManualModal: React.FC<Props> = ({ isOpen, onClose, onSave, on
     </div>
   );
 };
+'''
+
+with open("/workspaces/Dios/src/components/DhruviManualModal.tsx", "w") as f:
+    f.write(modal_code)
+print("✓ Successfully added dedicated Manual Target PTS (₹) and Manual Target PTR (₹) Input Boxes!")

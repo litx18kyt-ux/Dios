@@ -1,5 +1,7 @@
 import * as XLSX from 'xlsx-js-style';
 import { AggregatedProduct } from '../parsers/common';
+import { memoryStore } from '../data/memoryStore';
+import { MASTER_PRODUCTS } from '../data/masterProducts';
 
 const MONTHS = ['APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER', 'JANUARY', 'FEBRUARY', 'MARCH'];
 
@@ -89,6 +91,53 @@ export function exportToExcel(
   activeParties: string[],
   summary: { totalSalesUnits: number; totalClosingUnits: number; totalSalesValue: number; totalClosingValue: number; totalPriUnits?: number; totalPriValue?: number }
 ) {
+  const mode = memoryStore.dhruviValuationMode || 'PTS';
+  const prodMap = new Map(MASTER_PRODUCTS.map(p => [p.sn, p]));
+
+  // Calculate Party Wise Values with Dhruvi Mode Support
+  const partySalesValues: Record<string, number> = {};
+  const partyClosingValues: Record<string, number> = {};
+
+  activeParties.forEach(party => {
+    const isDhruvi = party.toLowerCase().includes('dhruvi');
+    let sVal = 0;
+    let cVal = 0;
+
+    if (isDhruvi) {
+      if (mode === 'MANUAL_PTR' && parseFloat(memoryStore.dhruviManualPtrTotal)) {
+        sVal = parseFloat(memoryStore.dhruviManualPtrTotal.replace(/,/g, '')) || 0;
+        cVal = products.reduce((acc, p) => {
+          const mp = prodMap.get(p.sn);
+          return acc + ((p.partyBreakdown[party]?.closing || 0) * (mp?.ptr || p.pts));
+        }, 0);
+      } else if (mode === 'MANUAL_PTS' && parseFloat(memoryStore.dhruviManualPtsTotal)) {
+        sVal = parseFloat(memoryStore.dhruviManualPtsTotal.replace(/,/g, '')) || 0;
+        cVal = products.reduce((acc, p) => acc + ((p.partyBreakdown[party]?.closing || 0) * p.pts), 0);
+      } else if (mode === 'PTR') {
+        sVal = products.reduce((acc, p) => {
+          const mp = prodMap.get(p.sn);
+          return acc + ((p.partyBreakdown[party]?.sales || 0) * (mp?.ptr || p.pts));
+        }, 0);
+        cVal = products.reduce((acc, p) => {
+          const mp = prodMap.get(p.sn);
+          return acc + ((p.partyBreakdown[party]?.closing || 0) * (mp?.ptr || p.pts));
+        }, 0);
+      } else {
+        sVal = products.reduce((acc, p) => acc + ((p.partyBreakdown[party]?.sales || 0) * p.pts), 0);
+        cVal = products.reduce((acc, p) => acc + ((p.partyBreakdown[party]?.closing || 0) * p.pts), 0);
+      }
+    } else {
+      sVal = products.reduce((acc, p) => acc + ((p.partyBreakdown[party]?.sales || 0) * p.pts), 0);
+      cVal = products.reduce((acc, p) => acc + ((p.partyBreakdown[party]?.closing || 0) * p.pts), 0);
+    }
+
+    partySalesValues[party] = sVal;
+    partyClosingValues[party] = cVal;
+  });
+
+  const finalTotalSalesValue = Object.values(partySalesValues).reduce((a, b) => a + b, 0);
+  const finalTotalClosingValue = Object.values(partyClosingValues).reduce((a, b) => a + b, 0);
+
   // =============================================================
   // SHEET 1: UN.SALES PROG (HQ TOTAL 12 MONTHS)
   // =============================================================
@@ -131,7 +180,7 @@ export function exportToExcel(
   });
   wsData.push(row4);
 
-  // 🎯 PRODUCTS ROWS: Injects exact p.netPri!
+  // Data rows
   products.forEach(p => {
     const row: any[] = [
       { v: p.sn, s: styleCellCenter },
@@ -159,7 +208,7 @@ export function exportToExcel(
     wsData.push(row);
   });
 
-  // 🎯 GRAND TOTAL (UNITS) ROW: Primary Included!
+  // Grand Total Units
   const totPriUnits = summary.totalPriUnits !== undefined 
     ? summary.totalPriUnits 
     : products.reduce((acc, p) => acc + (p.netPri || 0), 0);
@@ -186,7 +235,7 @@ export function exportToExcel(
   });
   wsData.push(rowTotal);
 
-  // 🎯 TOTAL VALUE (RUPEES) ROW: Primary Rupee Value Included!
+  // Total Value in Rupees
   const totPriVal = summary.totalPriValue !== undefined 
     ? summary.totalPriValue 
     : products.reduce((acc, p) => acc + (p.priValue || ((p.netPri || 0) * p.pts)), 0);
@@ -200,8 +249,8 @@ export function exportToExcel(
     if (m.toUpperCase() === selectedMonth.toUpperCase()) {
       rowValue.push(
         { v: `₹ ${Math.round(totPriVal).toLocaleString()}`, s: { ...styleTotalRow, font: { bold: true, color: { rgb: '1D4ED8' } } } },
-        { v: `₹ ${Math.round(summary.totalSalesValue).toLocaleString()}`, s: styleTotalRow },
-        { v: `₹ ${Math.round(summary.totalClosingValue).toLocaleString()}`, s: styleTotalRow }
+        { v: `₹ ${Math.round(finalTotalSalesValue).toLocaleString()}`, s: styleTotalRow },
+        { v: `₹ ${Math.round(finalTotalClosingValue).toLocaleString()}`, s: styleTotalRow }
       );
     } else {
       rowValue.push(
@@ -226,11 +275,7 @@ export function exportToExcel(
     });
   });
 
-  const colWidths: any[] = [
-    { wch: 6 },
-    { wch: 35 },
-    { wch: 12 },
-  ];
+  const colWidths: any[] = [{ wch: 6 }, { wch: 35 }, { wch: 12 }];
   MONTHS.forEach(() => {
     colWidths.push({ wch: 11 }, { wch: 11 }, { wch: 12 });
   });
@@ -238,20 +283,19 @@ export function exportToExcel(
   ws['!rows'] = [{ hpt: 30 }, { hpt: 22 }, { hpt: 22 }, { hpt: 20 }];
 
   // =============================================================
-  // SHEET 2: 2-TIER PARTY BREAKDOWN
+  // SHEET 2: 2-TIER PARTY BREAKDOWN (WITH DHRUVI VALUATION MODE)
   // =============================================================
   const bData: any[][] = [];
-  const bTotalCols = 3 + activeParties.length * 2 + 2;
-
-  // Row 1: Party Headers
   const bRow1: any[] = [
     { v: 'S.N.', s: styleSubColHeader },
     { v: 'PRODUCT NAME', s: styleSubColHeader },
     { v: 'PTS (₹)', s: styleSubColHeader }
   ];
   activeParties.forEach(p => {
+    const isDhruvi = p.toLowerCase().includes('dhruvi');
+    const headerTitle = isDhruvi ? `DHRUVI (${mode})` : p.toUpperCase();
     bRow1.push(
-      { v: p.toUpperCase(), s: stylePartyHeader },
+      { v: headerTitle, s: stylePartyHeader },
       { v: '', s: stylePartyHeader }
     );
   });
@@ -261,7 +305,6 @@ export function exportToExcel(
   );
   bData.push(bRow1);
 
-  // Row 2: Sub-headers
   const bRow2: any[] = [
     { v: '', s: styleSubColHeader },
     { v: '', s: styleSubColHeader },
@@ -279,7 +322,6 @@ export function exportToExcel(
   );
   bData.push(bRow2);
 
-  // Data Rows
   products.forEach(p => {
     const row: any[] = [
       { v: p.sn, s: styleCellCenter },
@@ -324,28 +366,27 @@ export function exportToExcel(
   );
   bData.push(bRowTotal);
 
-  // Grand Total Row (Value in ₹)
+  // Grand Total Row (Value in ₹) - Applies Mode
   const bRowValue: any[] = [
     { v: '₹', s: styleTotalRow },
     { v: 'TOTAL VALUE (RUPEES)', s: { ...styleTotalRow, alignment: { horizontal: 'left', vertical: 'center' } } },
     { v: '-', s: styleTotalRow }
   ];
   activeParties.forEach(party => {
-    const partyValSales = products.reduce((acc, p) => acc + ((p.partyBreakdown[party]?.sales || 0) * p.pts), 0);
-    const partyValClosing = products.reduce((acc, p) => acc + ((p.partyBreakdown[party]?.closing || 0) * p.pts), 0);
+    const sVal = partySalesValues[party] || 0;
+    const cVal = partyClosingValues[party] || 0;
     bRowValue.push(
-      { v: `₹ ${Math.round(partyValSales).toLocaleString()}`, s: styleTotalRow },
-      { v: `₹ ${Math.round(partyValClosing).toLocaleString()}`, s: styleTotalRow }
+      { v: `₹ ${Math.round(sVal).toLocaleString()}`, s: styleTotalRow },
+      { v: `₹ ${Math.round(cVal).toLocaleString()}`, s: styleTotalRow }
     );
   });
   bRowValue.push(
-    { v: `₹ ${Math.round(summary.totalSalesValue).toLocaleString()}`, s: { ...styleTotalRow, font: { bold: true, sz: 11 } } },
-    { v: `₹ ${Math.round(summary.totalClosingValue).toLocaleString()}`, s: { ...styleTotalRow, font: { bold: true, sz: 11 } } }
+    { v: `₹ ${Math.round(finalTotalSalesValue).toLocaleString()}`, s: { ...styleTotalRow, font: { bold: true, sz: 11 } } },
+    { v: `₹ ${Math.round(finalTotalClosingValue).toLocaleString()}`, s: { ...styleTotalRow, font: { bold: true, sz: 11 } } }
   );
   bData.push(bRowValue);
 
   const wsBreakdown = XLSX.utils.aoa_to_sheet(bData);
-
   wsBreakdown['!merges'] = [
     { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },
     { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },
@@ -366,20 +407,13 @@ export function exportToExcel(
     e: { r: 0, c: totStartCol + 1 }
   });
 
-  const bCols: any[] = [
-    { wch: 6 },
-    { wch: 35 },
-    { wch: 12 },
-  ];
+  const bCols: any[] = [{ wch: 6 }, { wch: 35 }, { wch: 12 }];
   activeParties.forEach(() => {
-    bCols.push({ wch: 11 }, { wch: 12 });
+    bCols.push({ wch: 14 }, { wch: 14 });
   });
-  bCols.push({ wch: 14 }, { wch: 16 });
-
+  bCols.push({ wch: 15 }, { wch: 16 });
   wsBreakdown['!cols'] = bCols;
-  wsBreakdown['!rows'] = [{ hpt: 24 }, { hpt: 20 }];
 
-  // Build & Trigger Download
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'UN.SALES PROG');
   XLSX.utils.book_append_sheet(wb, wsBreakdown, 'PARTY BREAKDOWN');

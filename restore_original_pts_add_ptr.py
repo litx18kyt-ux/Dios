@@ -1,4 +1,4 @@
-export interface MasterProduct {
+master_products_code = '''export interface MasterProduct {
   sn: number;
   name: string;
   pack?: string;
@@ -83,3 +83,8 @@ export const MASTER_PRODUCTS: MasterProduct[] = [
   { sn: 72, name: "XILDA P TAB", pack: "1x10", pts: 82.93, ptr: 92.14, keywords: ["XILDA P", "XILDA-P"] },
   { sn: 73, name: "ZIRON CAPS", pack: "1x10", pts: 18.64, ptr: 20.72, keywords: ["ZIRON"] }
 ];
+'''
+
+with open("/workspaces/Dios/src/data/masterProducts.ts", "w") as f:
+    f.write(master_products_code)
+print("✓ Restored EXACT Original PTS Rates & Added PTR from PriceList.csv!")

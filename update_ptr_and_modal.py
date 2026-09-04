@@ -1,8 +1,159 @@
-import React, { useState } from 'react';
-import { Calculator, Search, X, Check, Trash2, Edit3, Settings2 } from 'lucide-react';
+import os, sys
+
+# 1. Update src/data/masterProducts.ts with PTS and PTR rates
+master_products_code = '''export interface MasterProduct {
+  sn: number;
+  name: string;
+  pack?: string;
+  pts: number;
+  ptr: number;
+  mrp?: number;
+  keywords: string[];
+}
+
+export const MASTER_PRODUCTS: MasterProduct[] = [
+  { sn: 1, name: "CALGYM 60K CAPS", pack: "1x4", pts: 90.16, ptr: 100.18, keywords: ["CALGYM 60K", "CALGYM-60K", "CALGYM 60 K", "CALGYM 60"] },
+  { sn: 2, name: "CALGYM TAB", pack: "1x10", pts: 81.78, ptr: 90.86, keywords: ["CALGYM TAB", "CALGYM"] },
+  { sn: 3, name: "CILDIOS 10 TAB", pack: "1x10", pts: 84.79, ptr: 94.21, keywords: ["CILDIOS 10", "CILDIOS-10", "CILDIOS 10 S"] },
+  { sn: 4, name: "CILDIOS 20 TAB", pack: "1X10", pts: 94.29, ptr: 104.76, keywords: ["CILDIOS 20", "CILDIOS-20", "CILDIOS 20 TAB"] },
+  { sn: 5, name: "CITICURE 500 TAB", pack: "1x10", pts: 539.31, ptr: 599.24, keywords: ["CITICURE 500", "CITICURE-500"] },
+  { sn: 6, name: "CITICURE PLUS TAB", pack: "1x10", pts: 553.37, ptr: 614.86, keywords: ["CITICURE PLUS"] },
+  { sn: 7, name: "DIOFLAM TAB", pack: "1x10", pts: 41.72, ptr: 46.35, keywords: ["DIOFLAM"] },
+  { sn: 8, name: "DIOMILIN NT TABLET", pack: "1x15", pts: 152.19, ptr: 169.10, keywords: ["DIOMILIN NT", "DIOMILIN-NT"] },
+  { sn: 9, name: "DIOSGLT 10 TAB", pack: "5x2x15", pts: 145.84, ptr: 162.05, keywords: ["DIOSGLT 10", "DIOSGLT-10", "DIOSGLT"] },
+  { sn: 10, name: "DIOZAM 10 TAB", pack: "1x10", pts: 60.75, ptr: 67.50, keywords: ["DIOZAM 10", "DIOZAM-10"] },
+  { sn: 11, name: "DIOZAM 5 TAB", pack: "1x10", pts: 35.03, ptr: 38.93, keywords: ["DIOZAM 5", "DIOZAM-5"] },
+  { sn: 12, name: "ESIPRAM 10MG TAB", pack: "1x10", pts: 65.83, ptr: 73.14, keywords: ["ESIPRAM 10", "ESIPRAM 10MG", "ESIPRAM 10 MG"] },
+  { sn: 13, name: "ESIPRAM PLUS TAB", pack: "1x10", pts: 105.39, ptr: 117.10, keywords: ["ESIPRAM PLUS"] },
+  { sn: 14, name: "FITJEE CAPS", pack: "1x10", pts: 105.16, ptr: 116.85, keywords: ["FITJEE CAPS", "FITJEE CAP"] },
+  { sn: 15, name: "FITJEE DM TABLET", pack: "1X 10", pts: 174.98, ptr: 194.42, keywords: ["FITJEE DM", "FITJEE-DM", "FITJEE CAPSULE"] },
+  { sn: 16, name: "FITJEE Q10 TAB", pack: "1x10", pts: 365.46, ptr: 406.06, keywords: ["FITJEE Q10", "FITJEE Q 10", "FITJEE-Q10"] },
+  { sn: 17, name: "ISIRON CAPS", pack: "1x10", pts: 63.65, ptr: 70.72, keywords: ["ISIRON"] },
+  { sn: 18, name: "LINAGET DM TAB", pack: "5X3X10", pts: 133.65, ptr: 148.50, keywords: ["LINAGET DM", "LINAGET-DM"] },
+  { sn: 19, name: "LINAGET-5 TAB", pack: "1x10", pts: 66.47, ptr: 73.86, keywords: ["LINAGET 5", "LINAGET-5"] },
+  { sn: 20, name: "LINAGET-D TAB", pack: "5X3X10", pts: 112.44, ptr: 124.93, keywords: ["LINAGET D", "LINAGET-D", "LINAGET- D"] },
+  { sn: 21, name: "LINAGET-E25", pack: "10x10", pts: 77.08, ptr: 85.65, keywords: ["LINAGET E 25", "LINAGET-E25", "LINAGET-E 25", "LINAGET E25", "LINAGET E", "LINAGET-E"] },
+  { sn: 22, name: "LINAGET-M-OD5/1000 TAB", pack: "1x10", pts: 91.93, ptr: 102.14, keywords: ["LINAGET M OD 5 1000", "LINAGET M OD 5/1000", "LINAGET-M-OD5/1000"] },
+  { sn: 23, name: "LINAGET-M-OD5/500 TAB", pack: "1x10", pts: 72.64, ptr: 80.72, keywords: ["LINAGET M OD 500", "LINAGET M OD 5 500", "LINAGET M OD 500 TA", "LINAGET M OD", "LINAGET-M-OD5/500", "LINAGET M-OD 5/500", "LINAGET-M-OD5/500 TABS"] },
+  { sn: 24, name: "LINAGET-M1000 TAB", pack: "1x10", pts: 82.93, ptr: 92.14, keywords: ["LINAGET M 1000", "LINAGET-M 1000", "LINAGET-M1000"] },
+  { sn: 25, name: "LINAGET-M500 TAB", pack: "1x10", pts: 58.46, ptr: 64.96, keywords: ["LINAGET M 500", "LINAGET-M 500", "LINAGET-M500"] },
+  { sn: 26, name: "METDIOS25", pack: "1X 10", pts: 31.32, ptr: 34.80, keywords: ["METDIOS 25", "METDIOS25"] },
+  { sn: 27, name: "METDIOS50", pack: "1X 10", pts: 37.71, ptr: 41.90, keywords: ["METDIOS 50", "METDIOS50"] },
+  { sn: 28, name: "NEUTOCID DSR CAPS", pack: "1X 10", pts: 66.12, ptr: 73.46, keywords: ["NEUTOCID DSR"] },
+  { sn: 29, name: "NEUTOCID LS TAB", pack: "1x10", pts: 123.24, ptr: 136.94, keywords: ["NEUTOCID LS"] },
+  { sn: 30, name: "PREMYLIN M 75 TAB", pack: "1x10", pts: 121.42, ptr: 134.91, keywords: ["PREMYLIN M 75", "PREMYLIN-M 75", "PREMYLIN M75", "PREMYLIN 75"] },
+  { sn: 31, name: "PREMYLIN MSR TAB", pack: "1x10", pts: 116.68, ptr: 129.65, keywords: ["PREMYLIN MSR", "PREMYLIN-M SR", "PREMYLIN M SR", "PREMYLIN MSR TAB"] },
+  { sn: 32, name: "PROSTADO D TAB", pack: "1x10", pts: 184.46, ptr: 204.95, keywords: ["PROSTADO D", "PROSTADO-D"] },
+  { sn: 33, name: "PROSTADO TAB", pack: "1x10", pts: 66.25, ptr: 73.61, keywords: ["PROSTADO TAB", "PROSTADO"] },
+  { sn: 34, name: "SOLEM 250 TAB", pack: "1x10", pts: 39.39, ptr: 43.76, keywords: ["SOLEM 250", "SOLEM-250"] },
+  { sn: 35, name: "SOLEM 500 TAB", pack: "1x10", pts: 83.06, ptr: 92.29, keywords: ["SOLEM 500", "SOLEM-500", "SOLEM-500 TABS"] },
+  { sn: 36, name: "VALROS 10 TAB", pack: "1x10", pts: 93.17, ptr: 103.52, keywords: ["VALROS 10", "VALROS-10"] },
+  { sn: 37, name: "VALROS 20 TAB", pack: "1x10", pts: 139.46, ptr: 154.96, keywords: ["VALROS 20", "VALROS-20"] },
+  { sn: 38, name: "VALROS 40TAB", pack: "10X3X10", pts: 185.07, ptr: 205.64, keywords: ["VALROS 40", "VALROS-40"] },
+  { sn: 39, name: "VALROS ASP CAPS", pack: "1x10", pts: 52.11, ptr: 57.90, keywords: ["VALROS ASP CAP", "VALROS ASP CAPS", "VALROS ASP"] },
+  { sn: 40, name: "VALROS ASP150 CAPS", pack: "1X 10", pts: 52.68, ptr: 58.54, keywords: ["VALROS ASP 150", "VALROS ASP150"] },
+  { sn: 41, name: "VALROS EZ-10", pack: "10X3X10", pts: 171.36, ptr: 190.40, keywords: ["VALROS EZ 10", "VALROS-EZ-10", "VALROS-EZ 10", "VALROS EZ10", "VALROS EZ"] },
+  { sn: 42, name: "VALROS EZ-20", pack: "10X3X10", pts: 171.36, ptr: 190.40, keywords: ["VALROS EZ 20", "VALROS-EZ-20", "VALROS-EZ 20", "VALROS EZ20"] },
+  { sn: 43, name: "VALROS EZ-40", pack: "10X3X10", pts: 171.36, ptr: 190.40, keywords: ["VALROS EZ 40", "VALROS-EZ-40", "VALROS-EZ 40", "VALROS EZ40"] },
+  { sn: 44, name: "VALROS F TAB", pack: "1x10", pts: 115.90, ptr: 128.78, keywords: ["VALROS F TAB", "VALROS-F TAB", "VALROS F"] },
+  { sn: 45, name: "VALROS GOLD 10 CAPS", pack: "1x10", pts: 108.20, ptr: 120.22, keywords: ["VALROS GOLD 10", "VALROS GOLD10", "VALROS GOLD CAP", "VALROS GOLD"] },
+  { sn: 46, name: "VALROS GOLD 20 CAPS", pack: "1x10", pts: 118.63, ptr: 131.81, keywords: ["VALROS GOLD 20", "VALROS GOLD20"] },
+  { sn: 47, name: "VALROS-F20 TAB", pack: "1X 10", pts: 250.07, ptr: 277.86, keywords: ["VALROS F 20", "VALROS-F 20", "VALROS-F20", "VALROS F20"] },
+  { sn: 48, name: "VIDGLIT M FOTRE TAB", pack: "1x10", pts: 110.80, ptr: 123.11, keywords: ["VIDGLIT M FORTE", "VIDGLIT M FOTRE", "VIDGLIT-M FORTE", "VIDGLIT FORTE", "VIDGLIT FOTRE", "VIDGLIT M FORTE TAB"] },
+  { sn: 49, name: "VIDGLIT M TAB", pack: "1x10", pts: 98.82, ptr: 109.80, keywords: ["VIDGLIT M TAB", "VIDGLIT-M", "VIDGLIT M"] },
+  { sn: 50, name: "VIDGLIT TAB", pack: "1x10", pts: 74.35, ptr: 82.61, keywords: ["VIDGLIT 20", "VIDGLIT TAB", "VIDGLIT"] },
+  { sn: 51, name: "VIDMET G 80 TAB", pack: "1x10", pts: 89.83, ptr: 99.81, keywords: ["VIDMET G 80", "VIDMET-G 80", "VIDMET G80"] },
+  { sn: 52, name: "VIDMET SR 1000MG TAB", pack: "1x10", pts: 27.40, ptr: 30.45, keywords: ["VIDMET SR 1000", "VIDMET-SR 1000", "VIDMET SR 1GM", "VIDMET SR 1GM TAB"] },
+  { sn: 53, name: "VIDMET SR 500MG TAB", pack: "1x10", pts: 13.19, ptr: 14.65, keywords: ["VIDMET SR 500", "VIDMET-SR 500", "VIDMET SR500"] },
+  { sn: 54, name: "VINTEL 20 TAB", pack: "1X 10", pts: 26.37, ptr: 29.30, keywords: ["VINTEL 20", "VINTEL-20"] },
+  { sn: 55, name: "VINTEL 40 TAB NEW", pack: "1x15", pts: 73.00, ptr: 81.11, keywords: ["VINTEL 40 TAB", "VINTEL-40 TAB", "VINTEL 40 TABS NEW", "VINTEL 40 TAB NEW", "VINTEL 40"] },
+  { sn: 56, name: "VINTEL 40AM TAB", pack: "1x10", pts: 62.74, ptr: 69.71, keywords: ["VINTEL AM 40", "VINTEL 40 AM", "VINTEL-40AM", "VINTEL AM40", "VINTEL-40 AM"] },
+  { sn: 57, name: "VINTEL 80 TAB", pack: "1x10", pts: 72.35, ptr: 80.39, keywords: ["VINTEL 80", "VINTEL-80"] },
+  { sn: 58, name: "VINTEL AM40 TAB", pack: "1x15", pts: 103.84, ptr: 115.38, keywords: ["VINTEL AM40 TAB", "VINTEL AM 40", "VINTEL AM40"] },
+  { sn: 59, name: "VINTEL CD TAB", pack: "1x10", pts: 62.93, ptr: 69.93, keywords: ["VINTEL CD", "VINTEL-CD"] },
+  { sn: 60, name: "VINTEL CT TAB", pack: "1x10", pts: 80.90, ptr: 89.89, keywords: ["VINTEL CT", "VINTEL-CT"] },
+  { sn: 61, name: "VINTEL CTC 6.25 TAB", pack: "10X3X10", pts: 126.17, ptr: 140.19, keywords: ["VINTEL CTC 6.25", "VINTEL-CTC 6.25", "VINTEL-CTC6.25", "VINTEL CTC 6 25"] },
+  { sn: 62, name: "VINTEL CTC TAB", pack: "1x10", pts: 138.93, ptr: 154.37, keywords: ["VINTEL CTC", "VINTEL-CTC"] },
+  { sn: 63, name: "VINTEL H40 TAB NEW", pack: "1x15", pts: 124.07, ptr: 137.85, keywords: ["VINTEL H 40", "VINTEL 40 H", "VINTEL-H-40", "VINTEL-H 40", "VINTEL 40H", "VINTEL-40H", "VINTEL H40"] },
+  { sn: 64, name: "VINTEL H80 TAB", pack: "1x10", pts: 104.78, ptr: 116.43, keywords: ["VINTEL H 80", "VINTEL-H80", "VINTEL H80"] },
+  { sn: 65, name: "Vintel M25 TAB", pack: "1x10", pts: 69.23, ptr: 76.92, keywords: ["VINTEL M 25", "VINTEL M25", "VINTEL-M25"] },
+  { sn: 66, name: "Vintel M50 TAB", pack: "1x10", pts: 76.15, ptr: 84.61, keywords: ["VINTEL M 50", "VINTEL M50", "VINTEL-M50"] },
+  { sn: 67, name: "VINVES-100 TAB", pack: "1X14", pts: 304.72, ptr: 338.58, keywords: ["VINVES 100", "VINVES-100"] },
+  { sn: 68, name: "VINVES-50 TAB", pack: "1X14", pts: 178.72, ptr: 198.58, keywords: ["VINVES 50", "VINVES-50", "VINVSE-50", "VINVSE 50"] },
+  { sn: 69, name: "XILDA 50 TAB", pack: "5x2x15", pts: 85.99, ptr: 95.54, keywords: ["XILDA 50", "XILDA-50", "XILDA TAB"] },
+  { sn: 70, name: "XILDA M 1000 TAB", pack: "5x2x15", pts: 78.17, ptr: 86.86, keywords: ["XILDA M 1000", "XILDA-M1000", "XILDA M 1000 TAB"] },
+  { sn: 71, name: "XILDA M 500 TAB", pack: "5x2x15", pts: 85.99, ptr: 95.54, keywords: ["XILDA M 500", "XILDA-M 500", "XILDA M TAB", "XILDA M"] },
+  { sn: 72, name: "XILDA P TAB", pack: "1x10", pts: 82.93, ptr: 92.14, keywords: ["XILDA P", "XILDA-P"] },
+  { sn: 73, name: "ZIRON CAPS", pack: "1x10", pts: 18.64, ptr: 20.72, keywords: ["ZIRON"] }
+];
+'''
+with open("/workspaces/Dios/src/data/masterProducts.ts", "w") as f:
+    f.write(master_products_code)
+print("✓ Updated masterProducts.ts with PTS and PTR Rates!")
+
+# 2. Update memoryStore.ts
+mem_code = '''export interface FwDayEntry {
+  date: number;
+  day: string;
+  areaWorked: string;
+  tpSubmitted: string;
+  drsMet: string | number;
+  chemistsMet: string | number;
+  withManager?: boolean;
+  workType?: string;
+}
+
+export interface PartyBreakdownItem {
+  id: string;
+  partyName: string;
+  amount: number;
+  note?: string;
+}
+
+export interface MonthBreakdownMap {
+  [key: string]: PartyBreakdownItem[];
+}
+
+export interface DhruviProductEntry {
+  sn: number;
+  salesFormula: string;
+  salesQty: number;
+  closingFormula: string;
+  closingQty: number;
+}
+
+export const DEFAULT_STOCKISTS = [
+  'NAGDA DISTRIBUTORS',
+  'MODI DISTRIBUTORS',
+  'SHREE VARDHMAN PHARMA',
+  'SUN DISTRIBUTORS',
+  'R.P. AGENCIES',
+  'DWARIKA MEDICALS'
+];
+
+export const memoryStore = {
+  dcrDataByMonth: {} as Record<string, FwDayEntry[]>,
+  currentDcrMonth: 'Aug-2026',
+  effortLevelData: null as Record<string, Record<string, string>> | null,
+  salesBreakdown: {} as MonthBreakdownMap,
+  dhruviEntries: {} as Record<number, DhruviProductEntry>,
+  dhruviManualPtrTotal: '' as string,
+  dhruviManualPtsTotal: '' as string,
+  beName: 'BANWARI LAL MEENA',
+  hqName: 'UDAIPUR',
+  lastSyncedMonthCode: 'AUG'
+};
+'''
+with open("/workspaces/Dios/src/data/memoryStore.ts", "w") as f:
+    f.write(mem_code)
+print("✓ Updated memoryStore.ts with dhruviManualPtrTotal & dhruviManualPtsTotal!")
+
+# 3. Update DhruviManualModal.tsx with Top PTR Target Box, PTS Box, and Live Calculations
+modal_code = '''import React, { useState } from 'react';
+import { Calculator, Search, X, Check, Trash2, Edit3, DollarSign } from 'lucide-react';
 import { MASTER_PRODUCTS } from '../data/masterProducts';
 import { PartyParseSummary } from '../parsers/common';
-import { memoryStore, DhruviProductEntry, DhruviValuationMode } from '../data/memoryStore';
+import { memoryStore, DhruviProductEntry } from '../data/memoryStore';
 
 export function evalExcelFormula(input: string): number {
   if (!input) return 0;
@@ -38,16 +189,12 @@ export const DhruviManualModal: React.FC<Props> = ({ isOpen, onClose, onSave, on
     return memoryStore.dhruviEntries || {};
   });
 
-  const [manualPtsTotal, setManualPtsTotal] = useState<string>(() => {
-    return memoryStore.dhruviManualPtsTotal || '';
-  });
-
   const [manualPtrTotal, setManualPtrTotal] = useState<string>(() => {
     return memoryStore.dhruviManualPtrTotal || '';
   });
 
-  const [valuationMode, setValuationMode] = useState<DhruviValuationMode>(() => {
-    return memoryStore.dhruviValuationMode || 'PTS';
+  const [manualPtsTotal, setManualPtsTotal] = useState<string>(() => {
+    return memoryStore.dhruviManualPtsTotal || '';
   });
 
   if (!isOpen) return null;
@@ -71,9 +218,8 @@ export const DhruviManualModal: React.FC<Props> = ({ isOpen, onClose, onSave, on
 
   const handleApply = () => {
     memoryStore.dhruviEntries = draft;
-    memoryStore.dhruviManualPtsTotal = manualPtsTotal;
     memoryStore.dhruviManualPtrTotal = manualPtrTotal;
-    memoryStore.dhruviValuationMode = valuationMode;
+    memoryStore.dhruviManualPtsTotal = manualPtsTotal;
 
     const itemsMap: Record<number, { sales: number; closing: number }> = {};
     let totalSales = 0;
@@ -105,18 +251,16 @@ export const DhruviManualModal: React.FC<Props> = ({ isOpen, onClose, onSave, on
   const handleReset = () => {
     if (window.confirm("Dhruvi ka saara data clear karna hai?")) {
       setDraft({});
-      setManualPtsTotal('');
       setManualPtrTotal('');
-      setValuationMode('PTS');
+      setManualPtsTotal('');
       memoryStore.dhruviEntries = {};
-      memoryStore.dhruviManualPtsTotal = '';
       memoryStore.dhruviManualPtrTotal = '';
-      memoryStore.dhruviValuationMode = 'PTS';
+      memoryStore.dhruviManualPtsTotal = '';
       onClear();
     }
   };
 
-  // Calculations
+  // Live Calculations for both PTS and PTR
   let totalLiveSalesUnits = 0;
   let totalLiveClosingUnits = 0;
   let totalLiveSalesPtsVal = 0;
@@ -138,9 +282,6 @@ export const DhruviManualModal: React.FC<Props> = ({ isOpen, onClose, onSave, on
     }
   });
 
-  const parsedManualPts = parseFloat(manualPtsTotal.replace(/,/g, '')) || 0;
-  const ptsVariance = parsedManualPts > 0 ? (totalLiveSalesPtsVal - parsedManualPts) : 0;
-
   const parsedManualPtr = parseFloat(manualPtrTotal.replace(/,/g, '')) || 0;
   const ptrVariance = parsedManualPtr > 0 ? (totalLiveSalesPtrVal - parsedManualPtr) : 0;
 
@@ -149,7 +290,7 @@ export const DhruviManualModal: React.FC<Props> = ({ isOpen, onClose, onSave, on
       <div className="bg-slate-900 border border-amber-500/40 rounded-3xl max-w-7xl w-full p-4 md:p-6 shadow-2xl flex flex-col max-h-[94vh]">
         
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800 mb-3">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
           <div className="flex items-center gap-3">
             <span className="p-2.5 bg-amber-500/20 text-amber-400 rounded-xl border border-amber-500/30">
               <Calculator size={22} />
@@ -163,32 +304,13 @@ export const DhruviManualModal: React.FC<Props> = ({ isOpen, onClose, onSave, on
               </p>
             </div>
           </div>
-
-          {/* 🌟 EXCEL VALUATION MODE SELECTION DROPDOWN */}
-          <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-2xl border-2 border-amber-500/50 shadow-md">
-            <span className="text-[11px] text-amber-300 font-bold uppercase flex items-center gap-1">
-              <Settings2 size={13} /> Excel Value Mode:
-            </span>
-            <select
-              value={valuationMode}
-              onChange={(e) => setValuationMode(e.target.value as DhruviValuationMode)}
-              className="bg-slate-900 border border-slate-700 text-amber-300 text-xs font-bold font-mono rounded-xl px-2.5 py-1 focus:outline-none focus:border-amber-400 cursor-pointer"
-            >
-              <option value="PTS">🔹 Calculated PTS (₹{Math.round(totalLiveSalesPtsVal).toLocaleString()})</option>
-              <option value="PTR">🔸 Calculated PTR (₹{Math.round(totalLiveSalesPtrVal).toLocaleString()})</option>
-              <option value="MANUAL_PTS">✏️ Manual Target PTS (₹{manualPtsTotal ? Number(manualPtsTotal).toLocaleString() : '0'})</option>
-              <option value="MANUAL_PTR">✏️ Manual Target PTR (₹{manualPtrTotal ? Number(manualPtrTotal).toLocaleString() : '0'})</option>
-            </select>
-          </div>
-
           <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer">
             <X size={20} />
           </button>
         </div>
 
-        {/* 🌟 4 TOP CARDS: SUMMARY & DUAL MANUAL TARGET BOXES */}
+        {/* 🌟 TOP SUMMARY & MANUAL TARGET BOXES */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
-          
           {/* Card 1: Sales Secondary Summary */}
           <div className="p-3 bg-slate-950 rounded-2xl border border-cyan-500/30 space-y-1">
             <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center justify-between">
@@ -196,11 +318,11 @@ export const DhruviManualModal: React.FC<Props> = ({ isOpen, onClose, onSave, on
               <span className="text-cyan-400 font-bold font-mono">{totalLiveSalesUnits.toLocaleString()} Units</span>
             </div>
             <div className="flex justify-between items-center text-xs font-mono">
-              <span className="text-slate-400">PTS Val:</span>
+              <span className="text-slate-400">PTS Value:</span>
               <span className="text-cyan-300 font-bold">₹ {Math.round(totalLiveSalesPtsVal).toLocaleString()}</span>
             </div>
             <div className="flex justify-between items-center text-xs font-mono">
-              <span className="text-amber-400 font-semibold">PTR Val:</span>
+              <span className="text-amber-400 font-semibold">PTR Value:</span>
               <span className="text-amber-300 font-bold">₹ {Math.round(totalLiveSalesPtrVal).toLocaleString()}</span>
             </div>
           </div>
@@ -212,49 +334,22 @@ export const DhruviManualModal: React.FC<Props> = ({ isOpen, onClose, onSave, on
               <span className="text-emerald-400 font-bold font-mono">{totalLiveClosingUnits.toLocaleString()} Units</span>
             </div>
             <div className="flex justify-between items-center text-xs font-mono">
-              <span className="text-slate-400">PTS Val:</span>
+              <span className="text-slate-400">PTS Value:</span>
               <span className="text-emerald-300 font-bold">₹ {Math.round(totalLiveClosingPtsVal).toLocaleString()}</span>
             </div>
             <div className="flex justify-between items-center text-xs font-mono">
-              <span className="text-amber-400 font-semibold">PTR Val:</span>
+              <span className="text-amber-400 font-semibold">PTR Value:</span>
               <span className="text-amber-300 font-bold">₹ {Math.round(totalLiveClosingPtrVal).toLocaleString()}</span>
             </div>
           </div>
 
-          {/* Card 3: 🟡 USER MANUAL PTS TARGET INPUT BOX */}
-          <div className="p-3 bg-slate-950 rounded-2xl border-2 border-cyan-500/60 shadow-lg shadow-cyan-950/30 flex flex-col justify-between">
-            <div>
-              <div className="text-[11px] text-cyan-300 uppercase font-bold flex items-center justify-between">
-                <span className="flex items-center gap-1.5"><Edit3 size={13} className="text-cyan-400" /> Manual Target PTS (₹)</span>
-                {parsedManualPts > 0 && (
-                  <span className={`text-[10px] font-mono font-bold ${ptsVariance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {ptsVariance >= 0 ? '+' : ''}₹{Math.round(ptsVariance).toLocaleString()}
-                  </span>
-                )}
-              </div>
-              <p className="text-[10px] text-slate-400 mt-0.5">Enter custom PTS target value:</p>
-            </div>
-            <input
-              type="text"
-              placeholder="e.g. 45000"
-              value={manualPtsTotal}
-              onChange={(e) => setManualPtsTotal(e.target.value)}
-              className="w-full bg-slate-900 border border-cyan-500/50 text-cyan-300 font-mono font-bold text-sm rounded-xl px-3 py-1.5 mt-1.5 focus:outline-none focus:border-cyan-400"
-            />
-          </div>
-
-          {/* Card 4: 🟠 USER MANUAL PTR TARGET INPUT BOX */}
+          {/* Card 3: 🌟 USER MANUAL PTR TARGET INPUT BOX (RUPEES) */}
           <div className="p-3 bg-slate-950 rounded-2xl border-2 border-amber-500/60 shadow-lg shadow-amber-950/30 flex flex-col justify-between">
             <div>
-              <div className="text-[11px] text-amber-300 uppercase font-bold flex items-center justify-between">
-                <span className="flex items-center gap-1.5"><Edit3 size={13} className="text-amber-400" /> Manual Target PTR (₹)</span>
-                {parsedManualPtr > 0 && (
-                  <span className={`text-[10px] font-mono font-bold ${ptrVariance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {ptrVariance >= 0 ? '+' : ''}₹{Math.round(ptrVariance).toLocaleString()}
-                  </span>
-                )}
+              <div className="text-[11px] text-amber-300 uppercase font-bold flex items-center gap-1.5">
+                <Edit3 size={13} className="text-amber-400" /> Manual Target PTR (₹ Rupees)
               </div>
-              <p className="text-[10px] text-slate-400 mt-0.5">Enter custom PTR target value:</p>
+              <p className="text-[10px] text-slate-400 mt-0.5">Enter your custom PTR value:</p>
             </div>
             <input
               type="text"
@@ -265,6 +360,16 @@ export const DhruviManualModal: React.FC<Props> = ({ isOpen, onClose, onSave, on
             />
           </div>
 
+          {/* Card 4: PTR Target Variance & Comparison */}
+          <div className="p-3 bg-slate-950 rounded-2xl border border-purple-500/30 flex flex-col justify-between">
+            <div className="text-[10px] text-slate-400 uppercase font-semibold">PTR Target Difference (Variance)</div>
+            <div className={`text-base font-bold font-mono ${ptrVariance === 0 ? 'text-slate-400' : ptrVariance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {parsedManualPtr > 0 ? `${ptrVariance >= 0 ? '+' : ''}₹ ${Math.round(ptrVariance).toLocaleString()}` : 'Enter Target Above'}
+            </div>
+            <div className="text-[10px] text-slate-500 font-mono">
+              Calc PTR (₹{Math.round(totalLiveSalesPtrVal).toLocaleString()}) − Target
+            </div>
+          </div>
         </div>
 
         {/* Search */}
@@ -415,3 +520,7 @@ export const DhruviManualModal: React.FC<Props> = ({ isOpen, onClose, onSave, on
     </div>
   );
 };
+'''
+with open("/workspaces/Dios/src/components/DhruviManualModal.tsx", "w") as f:
+    f.write(modal_code)
+print("✓ Updated DhruviManualModal.tsx with Top PTR Target Box, PTS Box, and Live Calculations!")

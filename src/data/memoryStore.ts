@@ -28,6 +28,8 @@ export interface DhruviProductEntry {
   closingQty: number;
 }
 
+export type DhruviValuationMode = 'PTS' | 'PTR' | 'MANUAL_PTR' | 'MANUAL_PTS';
+
 export const DEFAULT_STOCKISTS = [
   'NAGDA DISTRIBUTORS',
   'MODI DISTRIBUTORS',
@@ -43,6 +45,9 @@ export const memoryStore = {
   effortLevelData: null as Record<string, Record<string, string>> | null,
   salesBreakdown: {} as MonthBreakdownMap,
   dhruviEntries: {} as Record<number, DhruviProductEntry>,
+  dhruviManualPtrTotal: '' as string,
+  dhruviManualPtsTotal: '' as string,
+  dhruviValuationMode: 'PTS' as DhruviValuationMode,
   beName: 'BANWARI LAL MEENA',
   hqName: 'UDAIPUR',
   lastSyncedMonthCode: 'AUG'
